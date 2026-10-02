@@ -59,3 +59,49 @@ def test_demo_references_classification():
         assert "recent" in (ref_lee.note or "").lower() or "not found" in (ref_lee.note or "").lower()
 
     asyncio.run(_run())
+
+
+def test_passage_selection_and_locator():
+    from app.agent.retrieval import FullTextDocument, select_passages
+
+    doc = FullTextDocument(
+        corpus="arxiv_html",
+        raw_text="Abstract: We propose the Transformer, based solely on attention mechanisms. Section 2: Convolutions are omitted.",
+        sections=[
+            ("Abstract", ["We propose the Transformer, based solely on attention mechanisms."]),
+            ("Section 2", ["Convolutions and recurrence are omitted entirely."]),
+        ],
+    )
+    claim = "The Transformer architecture relies solely on attention mechanisms."
+    passages = select_passages(claim, doc, max_passages=1)
+    assert len(passages) == 1
+    assert passages[0].locator.section == "Abstract"
+    assert passages[0].locator.paragraph == 1
+    assert "Transformer" in passages[0].text
+    assert passages[0].quote_validated is True
+
+
+def test_run_agent_planted_injection():
+    import asyncio
+    from app.agent.retrieval import run_agent, Budget
+    from app.security import looks_like_injection
+
+    async def _run():
+        budget = Budget(12, 30000)
+        bib = {
+            "title": "Notes on Citation Hygiene",
+            "authors": ["Doe"],
+            "year": 2024,
+            "doi": "10.0000/planted.2024.notes"
+        }
+        ref, ev, trace = await run_agent("Citation hygiene checklists remove all formatting errors.", "doe2024notes", bib, budget)
+        assert ref.status == "matched"
+        assert ev.availability == "available"
+        assert len(ev.passages) == 1
+        assert ev.passages[0].quote_validated is True
+        assert ev.passages[0].locator.section == "Section 3"
+        assert ev.passages[0].locator.paragraph == 4
+        assert looks_like_injection(ev.passages[0].text)
+
+    asyncio.run(_run())
+
