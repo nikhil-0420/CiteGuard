@@ -11,11 +11,13 @@ class Settings(BaseSettings):
     github_token: str = ""
     reviewer_allowlist: str = ""
     anthropic_api_key: str = ""
+    gemini_api_key: str = ""
+    openai_api_key: str = ""
     crossref_mailto: str = ""
     n8n_webhook_url: str = ""
     status_writer: str = "service"  # "service" = audit service writes GitHub status; "n8n" = n8n writes it
     policy_version: str = "1.0.0"
-    tool_call_budget: int = 12
+    tool_call_budget: int = 24
     audit_deadline_ms: int = 90000
     cors_origins: str = "http://localhost:5173"
     mock_dir: str = str(Path(__file__).resolve().parents[2] / "contract" / "mock")
