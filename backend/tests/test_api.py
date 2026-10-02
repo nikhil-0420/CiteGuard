@@ -49,8 +49,11 @@ def test_webhook_signature_and_replay():
 
 
 def test_audit_endpoint_with_demo_brief():
-    with open("../demo/agent-brief.md") as f:
-        md = f.read()
+    from pathlib import Path
+    brief_path = Path(__file__).resolve().parents[2] / "demo" / "agent-brief.md"
+    if not brief_path.exists():
+        brief_path = Path(__file__).resolve().parents[1] / "demo" / "agent-brief.md"
+    md = brief_path.read_text(encoding="utf-8")
 
     with client() as c:
         resp = c.post("/api/audit", json={

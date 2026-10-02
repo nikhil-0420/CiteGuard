@@ -30,9 +30,12 @@ def test_compare_metadata_match():
 
 def test_demo_references_classification():
     import asyncio
+    from pathlib import Path
     async def _run():
-        with open("../demo/agent-brief.md") as f:
-            content = f.read()
+        brief_path = Path(__file__).resolve().parents[2] / "demo" / "agent-brief.md"
+        if not brief_path.exists():
+            brief_path = Path(__file__).resolve().parents[1] / "demo" / "agent-brief.md"
+        content = brief_path.read_text(encoding="utf-8")
         parsed = parse_markdown(content)
         assert parsed.complete
 
