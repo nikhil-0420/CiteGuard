@@ -1,0 +1,5 @@
+case_id,source_paper_id,split,natural_or_synthetic,claim_text,citation_key,gold_passage_locator,gold_label,expected_behavior,labeled_before_run,notes
+E-001,arxiv:1706.03762,dev,natural,The Transformer relies solely on attention mechanisms.,vaswani2017,Abstract ¶1,supported,decide,Y,example row
+E-002,arxiv:1512.03385,dev,synthetic,ResNets reach under 2% top-5 error on the ImageNet test set.,he2015,Abstract ¶2,contradicted,decide,Y,example row (planted number)
+E-003,arxiv:XXXX,heldout,natural,,,,supported|partial|not_supported|contradicted,decide,N,24 accessible held-out: 6 per label
+E-004,arxiv:XXXX,heldout,synthetic,,,,retrieval_failure,abstain,N,8 simulated retrieval failures: expected = abstain (review)

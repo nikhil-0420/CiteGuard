@@ -1,0 +1,333 @@
+{
+  "contract_version": "1.0",
+  "report_id": "passed",
+  "repo": "nikhil-0420/citeguard-demo",
+  "pr_number": 1,
+  "commit_sha": "9f3c2a1d7b6e4a58c0d1e2f3a4b5c6d7e8f90123",
+  "policy_version": "1.0.0",
+  "generated_at": "2026-10-03T12:30:00+00:00",
+  "cached": false,
+  "gate": {
+    "state": "success",
+    "description": "All claims satisfy policy",
+    "reasons": [
+      "CG-GATE-01",
+      "CG-HUMAN-01"
+    ],
+    "report_url": "http://localhost:5173/?report=passed"
+  },
+  "extraction": {
+    "markers_found": 4,
+    "claims_extracted": 4,
+    "complete": true,
+    "issues": []
+  },
+  "summary": {
+    "references_total": 4,
+    "claims_total": 4,
+    "counts": {
+      "supported": 2,
+      "partial": 1,
+      "not_supported_in_reviewed_evidence": 0,
+      "contradicted": 0,
+      "unavailable": 1
+    },
+    "review_count": 2,
+    "blocked_count": 0,
+    "passed_count": 2
+  },
+  "findings": [
+    {
+      "id": "F-001",
+      "claim_id": "C-001",
+      "claim_text": "The Transformer architecture relies solely on attention mechanisms, removing recurrence and convolutions.",
+      "line": 12,
+      "citation_key": "vaswani2017",
+      "reference": {
+        "key": "vaswani2017",
+        "title": "Attention Is All You Need",
+        "authors": [
+          "Vaswani",
+          "Shazeer",
+          "Parmar",
+          "Uszkoreit",
+          "Jones",
+          "Gomez",
+          "Kaiser",
+          "Polosukhin"
+        ],
+        "year": 2017,
+        "doi": "10.48550/arXiv.1706.03762",
+        "status": "matched",
+        "sources_agreeing": [
+          "crossref"
+        ],
+        "mismatch_fields": [],
+        "note": null
+      },
+      "evidence": {
+        "availability": "available",
+        "corpus": "arxiv_html",
+        "passages": [
+          {
+            "text": "We propose a new simple network architecture, the Transformer, based solely on attention mechanisms, dispensing with recurrence and convolutions entirely.",
+            "locator": {
+              "section": "Abstract",
+              "paragraph": 1
+            },
+            "quote_validated": true
+          }
+        ]
+      },
+      "judgment": {
+        "label": "supported",
+        "rationale": "Abstract states the architecture is based solely on attention and dispenses with recurrence and convolutions."
+      },
+      "rules_applied": [
+        "CG-SUPPORT-01"
+      ],
+      "action": "pass",
+      "exception": null,
+      "agent_trace": [
+        {
+          "step": 1,
+          "action": "resolve_identifier",
+          "observation": "DOI resolved to the intended work (title and year match)",
+          "reason": "Identity must be confirmed before judging support"
+        },
+        {
+          "step": 2,
+          "action": "fetch_fulltext",
+          "observation": "arXiv HTML retrieved, 14 sections",
+          "reason": "Need passages from the cited source"
+        },
+        {
+          "step": 3,
+          "action": "judge_claim",
+          "observation": "Quote found verbatim in Abstract",
+          "reason": "Complete claim covered by one passage"
+        }
+      ]
+    },
+    {
+      "id": "F-002",
+      "claim_id": "C-002",
+      "claim_text": "BERT pre-trains bidirectional representations by conditioning on both left and right context.",
+      "line": 15,
+      "citation_key": "devlin2018",
+      "reference": {
+        "key": "devlin2018",
+        "title": "BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding",
+        "authors": [
+          "Devlin",
+          "Chang",
+          "Lee",
+          "Toutanova"
+        ],
+        "year": 2018,
+        "doi": "10.48550/arXiv.1810.04805",
+        "status": "matched",
+        "sources_agreeing": [
+          "crossref"
+        ],
+        "mismatch_fields": [],
+        "note": null
+      },
+      "evidence": {
+        "availability": "available",
+        "corpus": "arxiv_html",
+        "passages": [
+          {
+            "text": "BERT is designed to pre-train deep bidirectional representations from unlabeled text by jointly conditioning on both left and right context in all layers.",
+            "locator": {
+              "section": "Abstract",
+              "paragraph": 1
+            },
+            "quote_validated": true
+          }
+        ]
+      },
+      "judgment": {
+        "label": "supported",
+        "rationale": "Abstract describes joint conditioning on left and right context for bidirectional pre-training."
+      },
+      "rules_applied": [
+        "CG-SUPPORT-01"
+      ],
+      "action": "pass",
+      "exception": null,
+      "agent_trace": [
+        {
+          "step": 1,
+          "action": "resolve_identifier",
+          "observation": "DOI resolved; metadata consistent",
+          "reason": "Confirm identity first"
+        },
+        {
+          "step": 2,
+          "action": "fetch_fulltext",
+          "observation": "arXiv HTML retrieved",
+          "reason": "Need source passages"
+        },
+        {
+          "step": 3,
+          "action": "judge_claim",
+          "observation": "Quote validated in Abstract",
+          "reason": "Claim fully covered"
+        }
+      ]
+    },
+    {
+      "id": "F-004",
+      "claim_id": "C-004",
+      "claim_text": "BERT improves performance on all natural language processing tasks.",
+      "line": 24,
+      "citation_key": "devlin2018",
+      "reference": {
+        "key": "devlin2018",
+        "title": "BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding",
+        "authors": [
+          "Devlin",
+          "Chang",
+          "Lee",
+          "Toutanova"
+        ],
+        "year": 2018,
+        "doi": "10.48550/arXiv.1810.04805",
+        "status": "matched",
+        "sources_agreeing": [
+          "crossref"
+        ],
+        "mismatch_fields": [],
+        "note": null
+      },
+      "evidence": {
+        "availability": "available",
+        "corpus": "arxiv_html",
+        "passages": [
+          {
+            "text": "BERT obtains new state-of-the-art results on eleven natural language processing tasks.",
+            "locator": {
+              "section": "Abstract",
+              "paragraph": 1
+            },
+            "quote_validated": true
+          }
+        ]
+      },
+      "judgment": {
+        "label": "partial",
+        "rationale": "Source supports gains on eleven tasks; 'all tasks' is broader than what was inspected."
+      },
+      "rules_applied": [
+        "CG-SUPPORT-01"
+      ],
+      "action": "review",
+      "exception": {
+        "reviewer": "nikhil-0420",
+        "reason": "Scope narrowed in follow-up commit note; reviewer accepts partial support.",
+        "commit_sha": "9f3c2a1d7b6e4a58c0d1e2f3a4b5c6d7e8f90123",
+        "at": "2026-10-03T12:41:09+00:00",
+        "original_action": "review"
+      },
+      "agent_trace": [
+        {
+          "step": 1,
+          "action": "resolve_identifier",
+          "observation": "DOI resolved",
+          "reason": "Identity first"
+        },
+        {
+          "step": 2,
+          "action": "fetch_fulltext",
+          "observation": "arXiv HTML retrieved",
+          "reason": "Need scope of results"
+        },
+        {
+          "step": 3,
+          "action": "judge_claim",
+          "observation": "Evidence covers eleven tasks, not all tasks",
+          "reason": "Scope of claim exceeds scope of evidence"
+        }
+      ]
+    },
+    {
+      "id": "F-006",
+      "claim_id": "C-006",
+      "claim_text": "Agentic verification loops reduce unsupported citations in scientific drafts by 40 percent.",
+      "line": 33,
+      "citation_key": "lee2026agentic",
+      "reference": {
+        "key": "lee2026agentic",
+        "title": "Agentic Verification Loops for Scientific Writing",
+        "authors": [
+          "Lee"
+        ],
+        "year": 2026,
+        "doi": null,
+        "status": "unresolved",
+        "sources_agreeing": [],
+        "mismatch_fields": [],
+        "note": "PLANTED reference for the demo. Not found in Crossref; recent works may be unindexed."
+      },
+      "evidence": {
+        "availability": "unavailable",
+        "corpus": "none",
+        "passages": []
+      },
+      "judgment": {
+        "label": "unavailable",
+        "rationale": "No matching record found; recent references may not be indexed yet. Evidence unavailable."
+      },
+      "rules_applied": [
+        "CG-EXIST-01",
+        "CG-EXIST-02"
+      ],
+      "action": "review",
+      "exception": {
+        "reviewer": "nikhil-0420",
+        "reason": "Recent preprint verified manually on the authors' page.",
+        "commit_sha": "9f3c2a1d7b6e4a58c0d1e2f3a4b5c6d7e8f90123",
+        "at": "2026-10-03T12:41:09+00:00",
+        "original_action": "review"
+      },
+      "agent_trace": [
+        {
+          "step": 1,
+          "action": "reformulate_title_query",
+          "observation": "0 Crossref hits for exact title",
+          "reason": "Try broader query"
+        },
+        {
+          "step": 2,
+          "action": "reformulate_title_query",
+          "observation": "0 hits for keyword query",
+          "reason": "One more reformulation within budget"
+        },
+        {
+          "step": 3,
+          "action": "stop_insufficient_evidence",
+          "observation": "No candidate record",
+          "reason": "Budget policy: stop and route to review, never guess"
+        }
+      ]
+    }
+  ],
+  "budget": {
+    "tool_calls_used": 18,
+    "tool_calls_max": 24,
+    "elapsed_ms": 41230,
+    "deadline_ms": 90000,
+    "exhausted": false
+  },
+  "review": {
+    "state": "approved_with_exceptions",
+    "request_url": "https://github.com/nikhil-0420/citeguard-demo/pull/1#issuecomment-1"
+  },
+  "voice_briefing": {
+    "available": false,
+    "cached": false,
+    "url": null,
+    "script": null
+  }
+}

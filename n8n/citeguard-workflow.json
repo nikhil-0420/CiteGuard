@@ -1,0 +1,54 @@
+{
+  "name": "CiteGuard - status + review routing (skeleton)",
+  "nodes": [
+    {
+      "parameters": { "httpMethod": "POST", "path": "citeguard", "responseMode": "onReceived", "options": {} },
+      "id": "n1", "name": "Webhook (from audit service)", "type": "n8n-nodes-base.webhook", "typeVersion": 2, "position": [0, 0],
+      "webhookId": "citeguard-events"
+    },
+    {
+      "parameters": {
+        "jsCode": "// 1) verify HMAC (X-CiteGuard-Signature) -> see n8n/README.md step 4 (needs raw body; enable 'Raw Body' on the Webhook node options)\n// 2) dedupe on idempotency_key using workflow static data\nconst body = $input.first().json.body;\nconst sd = $getWorkflowStaticData('global');\nsd.seen = sd.seen || {};\nif (sd.seen[body.idempotency_key]) { return [{ json: { duplicate: true } }]; }\nsd.seen[body.idempotency_key] = Date.now();\nconst r = body.report;\nreturn [{ json: { duplicate: false, event: body.event, repo: r.repo, sha: r.commit_sha, pr: r.pr_number, state: r.gate.state, description: r.gate.description.slice(0,140), url: r.gate.report_url, review_count: r.summary.review_count, blocked_count: r.summary.blocked_count } }];"
+      },
+      "id": "n2", "name": "Verify + dedupe + shape", "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [260, 0]
+    },
+    {
+      "parameters": { "conditions": { "boolean": [ { "value1": "={{$json.duplicate}}", "value2": false } ] } },
+      "id": "n3", "name": "Not duplicate?", "type": "n8n-nodes-base.if", "typeVersion": 1, "position": [520, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.github.com/repos/{{$json.repo}}/statuses/{{$json.sha}}",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [ { "name": "Accept", "value": "application/vnd.github+json" } ] },
+        "sendBody": true, "specifyBody": "json",
+        "jsonBody": "={\n  \"state\": \"{{$json.state}}\",\n  \"target_url\": \"{{$json.url}}\",\n  \"description\": \"{{$json.description}}\",\n  \"context\": \"CiteGuard\"\n}",
+        "authentication": "genericCredentialType", "genericAuthType": "httpHeaderAuth"
+      },
+      "id": "n4", "name": "Set commit status (GitHub)", "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [780, -80]
+    },
+    {
+      "parameters": { "conditions": { "string": [ { "value1": "={{$('Verify + dedupe + shape').item.json.event}}", "value2": "audit_complete" } ], "number": [ { "value1": "={{$('Verify + dedupe + shape').item.json.review_count}}", "operation": "larger", "value2": 0 } ] } },
+      "id": "n5", "name": "Needs review request?", "type": "n8n-nodes-base.if", "typeVersion": 1, "position": [1040, -80]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.github.com/repos/{{$('Verify + dedupe + shape').item.json.repo}}/issues/{{$('Verify + dedupe + shape').item.json.pr}}/comments",
+        "sendBody": true, "specifyBody": "json",
+        "jsonBody": "={\n  \"body\": \"CiteGuard needs a human review: {{$('Verify + dedupe + shape').item.json.review_count}} finding(s) pending, {{$('Verify + dedupe + shape').item.json.blocked_count}} blocked. Report: {{$('Verify + dedupe + shape').item.json.url}}\"\n}",
+        "authentication": "genericCredentialType", "genericAuthType": "httpHeaderAuth"
+      },
+      "id": "n6", "name": "Post ONE review request (PR comment)", "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [1300, -160]
+    }
+  ],
+  "connections": {
+    "Webhook (from audit service)": { "main": [[{ "node": "Verify + dedupe + shape", "type": "main", "index": 0 }]] },
+    "Verify + dedupe + shape": { "main": [[{ "node": "Not duplicate?", "type": "main", "index": 0 }]] },
+    "Not duplicate?": { "main": [[{ "node": "Set commit status (GitHub)", "type": "main", "index": 0 }], []] },
+    "Set commit status (GitHub)": { "main": [[{ "node": "Needs review request?", "type": "main", "index": 0 }]] },
+    "Needs review request?": { "main": [[{ "node": "Post ONE review request (PR comment)", "type": "main", "index": 0 }], []] }
+  },
+  "settings": {}
+}

@@ -1,0 +1,36 @@
+{
+  "reports": [
+    {
+      "report_id": "blocked",
+      "repo": "nikhil-0420/citeguard-demo",
+      "pr_number": 1,
+      "commit_sha": "9f3c2a1d7b6e4a58c0d1e2f3a4b5c6d7e8f90123",
+      "gate_state": "failure",
+      "generated_at": "2026-10-03T12:30:00+00:00"
+    },
+    {
+      "report_id": "pending",
+      "repo": "nikhil-0420/citeguard-demo",
+      "pr_number": 1,
+      "commit_sha": "9f3c2a1d7b6e4a58c0d1e2f3a4b5c6d7e8f90123",
+      "gate_state": "pending",
+      "generated_at": "2026-10-03T12:30:00+00:00"
+    },
+    {
+      "report_id": "passed",
+      "repo": "nikhil-0420/citeguard-demo",
+      "pr_number": 1,
+      "commit_sha": "9f3c2a1d7b6e4a58c0d1e2f3a4b5c6d7e8f90123",
+      "gate_state": "success",
+      "generated_at": "2026-10-03T12:30:00+00:00"
+    },
+    {
+      "report_id": "error",
+      "repo": "nikhil-0420/citeguard-demo",
+      "pr_number": 1,
+      "commit_sha": "9f3c2a1d7b6e4a58c0d1e2f3a4b5c6d7e8f90123",
+      "gate_state": "error",
+      "generated_at": "2026-10-03T12:30:00+00:00"
+    }
+  ]
+}
