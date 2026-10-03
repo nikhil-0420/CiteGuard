@@ -1,17 +1,22 @@
 from __future__ import annotations
 import json
-from fastapi import APIRouter, BackgroundTasks, HTTPException, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse
 from ..config import settings
 from ..models import AuditRequest, ExceptionRequest, Exception_
 from ..store import store
 from ..policy import build_report_fields, now_iso
-from ..pipeline import run_audit
 from ..notify import publish
+from ..nuroen_client import trigger as nuroen_trigger
+from ..github_pr import fetch_pr_markdown, verify_pr_approval
+from ..github_status import set_commit_status
 from ..security import verify_github_signature, SeenEvents
+from .tools import require_key
 
 router = APIRouter()
 seen = SeenEvents()
+audited_commits: set[str] = set()
+in_progress_audits: set[str] = set()
 
 
 @router.get("/health")
@@ -34,15 +39,18 @@ def get_report(report_id: str):
     return r
 
 
-@router.post("/api/audit", status_code=202)
-async def start_audit(req: AuditRequest, bg: BackgroundTasks):
+@router.post("/api/audit", status_code=202, dependencies=[Depends(require_key)])
+async def start_audit(req: AuditRequest, force: bool = False):
     key = f"{req.repo}#{req.pr_number}@{req.commit_sha}"
-    if not seen.first_time(key):                      # idempotent per commit (CG-ACTION-01)
+    if not force and (key in audited_commits or key in in_progress_audits):
         return JSONResponse(status_code=202, content={"report_id": None, "duplicate": True})
-    report = await run_audit(req)                     # sync for now; Sam can move to background
-    store.put(report)
-    bg.add_task(publish, report, "audit_complete")
-    return {"report_id": report.report_id}
+    in_progress_audits.add(key)
+    try:
+        res = await nuroen_trigger(req)                  # Nuroen agents audit; they call /api/ingest when done
+        audited_commits.add(key)
+        return res
+    finally:
+        in_progress_audits.discard(key)
 
 
 @router.post("/api/reports/{report_id}/exceptions")
@@ -55,6 +63,9 @@ async def add_exception(report_id: str, body: ExceptionRequest):
     if body.commit_sha != r.commit_sha:                # stale approval on changed commit is rejected
         r.review.state = "stale"
         raise HTTPException(409, detail={"error": "approval is for a different commit", "code": "stale_commit"})
+    is_valid = await verify_pr_approval(r.repo, r.pr_number, body.commit_sha, body.reviewer)
+    if not is_valid:
+        raise HTTPException(403, detail={"error": "unverified GitHub approval", "code": "not_allowlisted"})
     f = next((x for x in r.findings if x.id == body.finding_id), None)
     if not f:
         raise HTTPException(404, detail={"error": "finding not found", "code": "not_found"})
@@ -72,8 +83,24 @@ async def add_exception(report_id: str, body: ExceptionRequest):
     return r
 
 
+async def _audit_pr(repo: str, pr: int, sha: str, force: bool = False):
+    key = f"{repo}#{pr}@{sha}"
+    if not force and (key in audited_commits or key in in_progress_audits):
+        return
+    in_progress_audits.add(key)
+    await set_commit_status(repo, sha, "pending", "CiteGuard is auditing this commit", "")
+    try:
+        md = await fetch_pr_markdown(repo, pr, sha)
+        await nuroen_trigger(AuditRequest(repo=repo, pr_number=pr, commit_sha=sha, markdown=md))
+        audited_commits.add(key)
+    except Exception as exc:                          # never leave the gate open on a technical failure
+        await set_commit_status(repo, sha, "error", f"CiteGuard could not start: {str(exc)[:90]}", "")
+    finally:
+        in_progress_audits.discard(key)
+
+
 @router.post("/webhooks/github", status_code=202)
-async def github_webhook(request: Request):
+async def github_webhook(request: Request, bg: BackgroundTasks):
     body = await request.body()
     if not verify_github_signature(settings.github_webhook_secret, body, request.headers.get("X-Hub-Signature-256")):
         raise HTTPException(401, detail={"error": "bad signature", "code": "bad_request"})
@@ -81,5 +108,11 @@ async def github_webhook(request: Request):
     if delivery and not seen.first_time(f"delivery:{delivery}"):
         return {"duplicate": True}
     payload = json.loads(body or b"{}")
-    # TODO(Sam): on pull_request opened/synchronize -> fetch PR markdown at head sha -> run audit.
+    if request.headers.get("X-GitHub-Event") == "pull_request" and payload.get("action") in ("opened", "synchronize", "reopened"):
+        repo = payload["repository"]["full_name"]
+        pr = payload["pull_request"]["number"]
+        sha = payload["pull_request"]["head"]["sha"]
+        key = f"{repo}#{pr}@{sha}"
+        if key not in audited_commits and key not in in_progress_audits:
+            bg.add_task(_audit_pr, repo, pr, sha)
     return {"accepted": True, "action": payload.get("action")}
