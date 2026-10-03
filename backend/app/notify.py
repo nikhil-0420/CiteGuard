@@ -4,7 +4,7 @@ import httpx
 from .config import settings
 from .models import AuditReport
 from .security import sign
-from .github_status import set_commit_status
+from .github_status import set_commit_status, post_or_update_pr_comment
 
 log = logging.getLogger("citeguard.notify")
 
@@ -19,6 +19,8 @@ async def publish(report: AuditReport, event: str) -> None:
     if settings.status_writer == "service":
         await set_commit_status(report.repo, report.commit_sha, report.gate.state,
                                 report.gate.description, report.gate.report_url)
+        if report.repo and report.pr_number:
+            await post_or_update_pr_comment(report.repo, report.pr_number, report)
     if not settings.n8n_webhook_url:
         return
     body = json.dumps({"event": event, "idempotency_key": idem_key(report, event),

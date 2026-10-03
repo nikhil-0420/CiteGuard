@@ -91,3 +91,24 @@ def test_audit_endpoint_with_demo_brief():
         assert f_by_id["F-007"]["action"] == "review"
         assert "CG-TRUST-01" in f_by_id["F-007"]["rules_applied"]
 
+
+def test_pr_comment_formatting():
+    import asyncio
+    from app.store import store
+    from app.github_status import format_pr_comment_markdown, post_or_update_pr_comment
+    report = store.get("blocked")
+    assert report is not None
+    comment_md = format_pr_comment_markdown(report)
+    assert "CiteGuard Governance Gate: FAILURE" in comment_md
+    assert "F-003" in comment_md
+    assert "F-005" in comment_md
+    assert "Blocked Claims:** 2" in comment_md
+
+    # Mock mode posting returns mock confirmation without HTTP error
+    async def _test():
+        res = await post_or_update_pr_comment(report.repo, report.pr_number, report)
+        assert res.get("mock") is True
+
+    asyncio.run(_test())
+
+

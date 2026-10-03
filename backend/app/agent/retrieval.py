@@ -505,76 +505,94 @@ async def fetch_fulltext(
             reason="Treat retrieved text as untrusted data",
         )
 
-    # 2. Extract arXiv ID
+    # 2. Extract arXiv ID (attempt arXiv if present)
     arxiv_id = extract_arxiv_id(ref.doi)
-    if not arxiv_id:
-        return None, AgentStep(
-            step=step_num,
-            action="stop_insufficient_evidence",
-            observation="No arXiv ID found in reference metadata",
-            reason="Full-text corpus requires arXiv ID",
-        )
-
-    if arxiv_id in _ARXIV_DOC_CACHE:
-        doc = _ARXIV_DOC_CACHE[arxiv_id]
-        return doc, AgentStep(
-            step=step_num,
-            action="fetch_fulltext",
-            observation=f"arXiv HTML retrieved, {len(doc.sections)} sections",
-            reason="Need passages from the cited source",
-        )
-
-    html_url = f"https://arxiv.org/html/{arxiv_id}"
-    if not url_allowed(html_url):
-        return None, AgentStep(
-            step=step_num,
-            action="stop_insufficient_evidence",
-            observation=f"Host not allowed: {html_url}",
-            reason="CG-TRUST-01: restricted to allowed retrieval hosts",
-        )
-
-    try:
-        resp = await client.get(
-            html_url,
-            headers={"User-Agent": f"CiteGuard/1.0 (mailto:{settings.crossref_mailto or 'citeguard@example.com'})"},
-            follow_redirects=True,
-            timeout=18.0,
-        )
-        if resp.status_code == 200 and len(resp.content) <= MAX_RESPONSE_BYTES:
-            parser = ArxivHTMLSectionParser()
-            parser.feed(resp.text)
-            parser.close()
-            raw_text = " ".join(para for _, paras in parser.sections for para in paras)
-            doc = FullTextDocument(corpus="arxiv_html", raw_text=raw_text, sections=parser.sections)
-            _ARXIV_DOC_CACHE[arxiv_id] = doc
+    if arxiv_id:
+        if arxiv_id in _ARXIV_DOC_CACHE:
+            doc = _ARXIV_DOC_CACHE[arxiv_id]
             return doc, AgentStep(
                 step=step_num,
                 action="fetch_fulltext",
-                observation=f"arXiv HTML retrieved, {len(parser.sections)} sections",
+                observation=f"arXiv HTML retrieved, {len(doc.sections)} sections",
                 reason="Need passages from the cited source",
             )
-    except Exception:
-        pass
 
-    # Fallback to arXiv abstract via export.arxiv.org
+        html_url = f"https://arxiv.org/html/{arxiv_id}"
+        if url_allowed(html_url):
+            try:
+                resp = await client.get(
+                    html_url,
+                    headers={"User-Agent": f"CiteGuard/1.0 (mailto:{settings.crossref_mailto or 'citeguard@example.com'})"},
+                    follow_redirects=True,
+                    timeout=18.0,
+                )
+                if resp.status_code == 200 and len(resp.content) <= MAX_RESPONSE_BYTES:
+                    parser = ArxivHTMLSectionParser()
+                    parser.feed(resp.text)
+                    parser.close()
+                    raw_text = " ".join(para for _, paras in parser.sections for para in paras)
+                    doc = FullTextDocument(corpus="arxiv_html", raw_text=raw_text, sections=parser.sections)
+                    _ARXIV_DOC_CACHE[arxiv_id] = doc
+                    return doc, AgentStep(
+                        step=step_num,
+                        action="fetch_fulltext",
+                        observation=f"arXiv HTML retrieved, {len(parser.sections)} sections",
+                        reason="Need passages from the cited source",
+                    )
+            except Exception:
+                pass
+
+        # Fallback to arXiv abstract via export.arxiv.org
+        try:
+            api_url = f"https://export.arxiv.org/api/query?id_list={arxiv_id}"
+            if url_allowed(api_url):
+                resp = await client.get(api_url, timeout=12.0)
+                if resp.status_code == 200:
+                    root = ET.fromstring(resp.text)
+                    ns = {"atom": "http://www.w3.org/2005/Atom"}
+                    entry = root.find("atom:entry", ns)
+                    if entry is not None:
+                        summary_el = entry.find("atom:summary", ns)
+                        summary = " ".join((summary_el.text or "").split()) if summary_el is not None else ""
+                        if summary:
+                            doc = FullTextDocument(corpus="arxiv_html", raw_text=summary, sections=[("Abstract", [summary])])
+                            _ARXIV_DOC_CACHE[arxiv_id] = doc
+                            return doc, AgentStep(
+                                step=step_num,
+                                action="fetch_fulltext",
+                                observation="arXiv abstract retrieved via API",
+                                reason="Fallback to abstract when HTML is unavailable",
+                            )
+        except Exception:
+            pass
+
+    # Fallback to Europe PMC (corpus="europe_pmc")
     try:
-        api_url = f"https://export.arxiv.org/api/query?id_list={arxiv_id}"
-        if url_allowed(api_url):
-            resp = await client.get(api_url, timeout=12.0)
-            if resp.status_code == 200:
-                root = ET.fromstring(resp.text)
-                ns = {"atom": "http://www.w3.org/2005/Atom"}
-                entry = root.find("atom:entry", ns)
-                if entry is not None:
-                    summary_el = entry.find("atom:summary", ns)
-                    summary = " ".join((summary_el.text or "").split()) if summary_el is not None else ""
-                    if summary:
-                        doc = FullTextDocument(corpus="arxiv_html", raw_text=summary, sections=[("Abstract", [summary])])
+        epmc_query = f"DOI:{ref.doi}" if ref.doi else f'TITLE:"{ref.title}"'
+        epmc_url = "https://www.ebi.ac.uk/europepmc/webservices/rest/search"
+        if url_allowed(epmc_url):
+            epmc_resp = await client.get(
+                epmc_url,
+                params={"query": epmc_query, "format": "json", "resultType": "core"},
+                timeout=12.0,
+            )
+            if epmc_resp.status_code == 200 and len(epmc_resp.content) <= MAX_RESPONSE_BYTES:
+                data = epmc_resp.json()
+                results = data.get("resultList", {}).get("result", [])
+                if results:
+                    abstract_text = results[0].get("abstractText", "")
+                    if abstract_text:
+                        clean_abs = " ".join(abstract_text.split())
+                        doc = FullTextDocument(
+                            corpus="europe_pmc",
+                            raw_text=clean_abs,
+                            sections=[("Abstract", [clean_abs])],
+                        )
                         return doc, AgentStep(
                             step=step_num,
                             action="fetch_fulltext",
-                            observation="arXiv abstract retrieved via API",
-                            reason="Fallback to abstract when HTML is unavailable",
+                            observation="Europe PMC abstract retrieved via API",
+                            reason="Fallback to Europe PMC when arXiv is unavailable",
                         )
     except Exception:
         pass
@@ -582,7 +600,7 @@ async def fetch_fulltext(
     return None, AgentStep(
         step=step_num,
         action="stop_insufficient_evidence",
-        observation="Could not retrieve full text or abstract from arXiv",
+        observation="Could not retrieve full text or abstract from arXiv or Europe PMC",
         reason="Retrieval failed or timed out",
     )
 

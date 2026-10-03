@@ -200,6 +200,15 @@ def main():
     print(f"Precision:        {precision * 100:.1f}%")
     print(f"Recall:           {recall * 100:.1f}%")
     print(f"Median Latency:   {med_latency} ms (min={min(latencies) if latencies else 0}ms, max={max(latencies) if latencies else 0}ms)")
+    print("\n" + "=" * 75)
+    print("SLOTS VALUES FOR NIKHIL'S EVALPAGE (Observed Event-Day Numbers):")
+    print("=" * 75)
+    print(f"  Decision coverage:            {100.0 if total > 0 else 0:.1f}%")
+    print(f"  Accuracy when deciding:       {acc * 100:.1f}%")
+    print(f"  Unsafe automatic passes:      {fp}/26 (Observed: {fp})")
+    print(f"  Useful automatic passes:      {tp}/6 (Observed: {tp})")
+    print(f"  Median latency · range:       {med_latency} ms (min={min(latencies) if latencies else 0}ms, max={max(latencies) if latencies else 0}ms)")
+    print(f"  Confusion counts:             TP {tp} | FP {fp} | FN {fn} | TN {tn}")
     print("=" * 75)
     return 0
 

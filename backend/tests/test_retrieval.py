@@ -140,4 +140,43 @@ def test_retrieval_cache():
     asyncio.run(_run())
 
 
+def test_europe_pmc_fallback():
+    import asyncio
+    from unittest.mock import AsyncMock
+    import httpx
+    from app.agent.retrieval import fetch_fulltext, Budget
+    from app.models import Reference
+
+    async def _run():
+        budget = Budget(5, 30000)
+        ref = Reference(
+            key="lancet2024",
+            title="Global burden of disease study",
+            authors=["Smith"],
+            year=2024,
+            doi="10.1016/S0140-6736(24)00001-1",  # Non-arXiv journal DOI
+            status="matched",
+            sources_agreeing=["crossref"],
+            mismatch_fields=[],
+        )
+
+        # Mock Europe PMC search response using real httpx.Response
+        mock_client = AsyncMock(spec=httpx.AsyncClient)
+        mock_resp = httpx.Response(
+            200,
+            json={"resultList": {"result": [{"abstractText": "This landmark study shows global improvements in child mortality."}]}},
+        )
+        mock_client.get.return_value = mock_resp
+
+        doc, step = await fetch_fulltext(ref, client=mock_client, budget=budget, step_num=1)
+        assert doc is not None
+        assert doc.corpus == "europe_pmc"
+        assert "child mortality" in doc.raw_text
+        assert step.action == "fetch_fulltext"
+        assert "Europe PMC" in step.observation
+
+    asyncio.run(_run())
+
+
+
 

@@ -1,13 +1,16 @@
 """Orchestrates one audit: parse -> (agent per claim) -> policy -> report."""
 from __future__ import annotations
+import asyncio
 import time
 import uuid
+from typing import Optional
 import httpx
 
 from .models import (
     AuditReport,
     AuditRequest,
     Finding,
+    Summary,
     Budget as BudgetModel,
     Extraction,
     Review,
@@ -19,6 +22,47 @@ from .policy import build_report_fields, now_iso
 from .config import settings
 from .agent.retrieval import run_agent, Budget
 from .agent.judge import judge_claim
+
+
+def generate_voice_script(findings: list[Finding], summary: Summary, gate_state: str) -> Optional[str]:
+    """Dynamically generate concise, professional audio briefing text for any document."""
+    total = len(findings)
+    if not total:
+        return None
+
+    if gate_state == "failure":
+        blocked_findings = [f for f in findings if f.action == "block"]
+        reasons_list = []
+        for f in blocked_findings[:2]:
+            fid_word = f.id.lower().replace("-", " ")
+            if f.judgment.label == "contradicted":
+                reasons_list.append(f"{fid_word} is contradicted by its source")
+            elif f.reference.status == "metadata_mismatch":
+                reasons_list.append(f"{fid_word} has an identity mismatch")
+            elif "CG-TRUST-01" in f.rules_applied:
+                reasons_list.append(f"{fid_word} contains untrusted prompt injection")
+            else:
+                reasons_list.append(f"{fid_word} violates policy")
+
+        reasons_str = ", and ".join(reasons_list) if reasons_list else "blocked by policy"
+        review_mention = f" {summary.review_count} need human review." if summary.review_count > 0 else ""
+        return (
+            f"CiteGuard checked {total} claims. {summary.blocked_count} are blocked: {reasons_str}."
+            f"{review_mention} Fix the blocked items or ask an authorized reviewer for an exception."
+        )
+    elif gate_state == "pending":
+        review_findings = [f for f in findings if f.action == "review"]
+        first_few = [f.id.lower().replace("-", " ") for f in review_findings[:2]]
+        mention = " and ".join(first_few) if first_few else "several findings"
+        return (
+            f"CiteGuard checked {total} claims. {summary.review_count} require human sign-off, "
+            f"including {mention}. An authorized reviewer must record an exception before merge."
+        )
+    elif gate_state == "success":
+        return f"CiteGuard checked {total} claims. All claims satisfy policy and gate is approved."
+    elif gate_state == "error":
+        return "CiteGuard extraction error: citation markers could not be fully parsed. Automated gate cannot pass."
+    return None
 
 
 async def run_audit(req: AuditRequest) -> AuditReport:
@@ -36,7 +80,7 @@ async def run_audit(req: AuditRequest) -> AuditReport:
     )
     limits = httpx.Limits(max_keepalive_connections=10, max_connections=20)
     async with httpx.AsyncClient(limits=limits) as client:
-        for idx, claim in enumerate(parsed.claims, start=1):
+        async def _audit_single_claim(idx: int, claim) -> Finding:
             fid = f"F-{idx:03d}"
             bib_entry = parsed.bibliography.get(claim.key, {})
 
@@ -65,7 +109,7 @@ async def run_audit(req: AuditRequest) -> AuditReport:
                     reason="Complete claim covered by one passage" if judgment.label == "supported" else "Evaluated claim against retrieved evidence",
                 ))
 
-            findings.append(Finding(
+            return Finding(
                 id=fid,
                 claim_id=claim.claim_id,
                 claim_text=claim.text,
@@ -75,7 +119,12 @@ async def run_audit(req: AuditRequest) -> AuditReport:
                 evidence=evidence,
                 judgment=judgment,
                 agent_trace=trace,
-            ))
+            )
+
+        if parsed.claims:
+            claim_tasks = [_audit_single_claim(idx, claim) for idx, claim in enumerate(parsed.claims, start=1)]
+            findings = await asyncio.gather(*claim_tasks)
+            findings = list(findings)
 
     if parsed.claims and not findings:
         technical_error = True
@@ -84,16 +133,8 @@ async def run_audit(req: AuditRequest) -> AuditReport:
         findings, len(parsed.bibliography), parsed.complete, req.commit_sha, url, technical_error,
     )
 
-    # Generate concise voice briefing script
-    voice_script = None
-    if gate.state == "failure":
-        voice_script = (
-            f"CiteGuard checked {len(findings)} claims. {summary.blocked_count} are blocked: "
-            f"finding three is contradicted by its source, and finding five has an identity mismatch. "
-            f"{summary.review_count} need human review. Fix the blocked items or ask an authorized reviewer for an exception."
-        )
-    elif gate.state == "success":
-        voice_script = f"CiteGuard checked {len(findings)} claims. All claims satisfy policy and gate is approved."
+    # Dynamically generated concise voice briefing script
+    voice_script = generate_voice_script(findings, summary, gate.state)
 
     voice_briefing = VoiceBriefing(
         available=bool(voice_script),
