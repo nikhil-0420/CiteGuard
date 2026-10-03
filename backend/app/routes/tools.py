@@ -1,7 +1,7 @@
 """Tool + callback endpoints for the Nuroen agents (Nuroen -> us). All guarded by X-API-Key.
 LLM proposes (in Nuroen), this code disposes (deterministic)."""
 from __future__ import annotations
-import re, time, uuid, unicodedata
+import re, time, uuid, unicodedata, hmac
 from difflib import SequenceMatcher
 from typing import Optional
 from fastapi import APIRouter, Depends, Header, HTTPException
@@ -21,7 +21,7 @@ ingest_router = APIRouter(tags=["ingest"])
 
 
 def require_key(x_api_key: str | None = Header(default=None)):
-    if not x_api_key or x_api_key != settings.tools_api_key:
+    if not x_api_key or not hmac.compare_digest(x_api_key, settings.tools_api_key):
         raise HTTPException(401, detail={"error": "bad api key", "code": "bad_request"})
 
 

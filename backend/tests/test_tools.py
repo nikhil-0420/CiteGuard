@@ -308,4 +308,36 @@ def test_latest_nuroen_payload_endpoint_and_token_cleanliness(capsys):
                 assert forbidden not in payload_str
 
 
+def test_startup_secret_validation_and_allowlist_warning(caplog):
+    import pytest
+    from app.config import settings
+    from app.main import lifespan
+
+    # Case 1: Outside mock mode, default tools_api_key raises RuntimeError
+    settings.mock_mode = False
+    settings.tools_api_key = "change-me"
+    settings.github_webhook_secret = "good-secret"
+    settings.github_token = "good-token"
+
+    import asyncio
+    async def try_lifespan():
+        async with lifespan(app):
+            pass
+
+    with pytest.raises(RuntimeError, match="Production mode requires non-default secrets"):
+        asyncio.run(try_lifespan())
+
+    # Case 2: In mock mode, startup succeeds but empty allowlist logs warning
+    settings.mock_mode = True
+    settings.reviewer_allowlist = ""
+    with caplog.at_level("WARNING"):
+        asyncio.run(try_lifespan())
+    assert any("REVIEWER_ALLOWLIST is empty" in rec.message for rec in caplog.records)
+
+    # Reset
+    settings.reviewer_allowlist = "nikhil-0420"
+    settings.tools_api_key = "change-me"
+
+
+
 
