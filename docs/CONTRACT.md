@@ -14,7 +14,7 @@ Any change needs BOTH Nikhil and Sam to approve in the PR. After a change: updat
 | POST | `/api/audit` | `AuditRequest` -> 202 `{report_id}`; idempotent per repo+PR+commit |
 | POST | `/api/reports/{id}/exceptions` | `ExceptionRequest` -> updated `AuditReport`; 403 not allowlisted, 409 stale commit, 404 |
 | POST | `/webhooks/github` | HMAC `X-Hub-Signature-256`; duplicate delivery ids ignored |
-| OUT | `N8N_WEBHOOK_URL` | `N8nEvent`, header `X-CiteGuard-Signature` (HMAC-SHA256 hex of raw body) |
+| OUT | `NUROEN_WEBHOOK_URL` | `NuroenEvent`, header `X-CiteGuard-Signature` (HMAC-SHA256 hex of raw body) |
 
 ## Gate states -> GitHub commit status
 `success` approved · `pending` awaiting review · `failure` blocked · `error` technical/extraction problem (never passes). Context name: `CiteGuard`.

@@ -15,4 +15,4 @@
 | 11 | Retrieval to a non-allowlisted / non-https host | Refused | `test_security::test_retrieval_host_allowlist` |
 | 12 | Review timeout / no reviewer response | Stays `pending`, never auto-approves; new commit triggers a fresh audit | `test_policy` (pending without exceptions) + idempotency key includes commit sha |
 
-Also bind-checked: duplicate n8n events do not duplicate review requests (dedupe on `idempotency_key`).
+Also bind-checked: duplicate Nuroen events do not duplicate review requests (dedupe on `idempotency_key`).
