@@ -108,3 +108,36 @@ def test_run_agent_planted_injection():
 
     asyncio.run(_run())
 
+
+def test_retrieval_cache():
+    import asyncio
+    from app.agent.retrieval import (
+        _ARXIV_DOC_CACHE,
+        clear_retrieval_cache,
+        FullTextDocument,
+        fetch_fulltext,
+        Budget,
+    )
+    from app.models import Reference
+
+    async def _run():
+        clear_retrieval_cache()
+        assert len(_ARXIV_DOC_CACHE) == 0
+
+        # Prime cache with mock document
+        doc = FullTextDocument(corpus="arxiv_html", raw_text="Cached text", sections=[("Abstract", ["Cached text"])])
+        _ARXIV_DOC_CACHE["1706.03762"] = doc
+
+        ref = Reference(key="test", title="Test", authors=[], year=2017, doi="10.48550/arXiv.1706.03762", status="matched", sources_agreeing=[], mismatch_fields=[])
+        budget = Budget(10, 30000)
+        cached_doc, step = await fetch_fulltext(ref, client=None, budget=budget, step_num=1)
+        assert cached_doc is doc
+        assert step.action == "fetch_fulltext"
+
+        clear_retrieval_cache()
+        assert len(_ARXIV_DOC_CACHE) == 0
+
+    asyncio.run(_run())
+
+
+

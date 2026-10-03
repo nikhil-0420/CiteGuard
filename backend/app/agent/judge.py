@@ -37,11 +37,45 @@ def validate_quote(quote: str, source_text: str) -> bool:
 def parse_judgment_json(raw: str) -> Judgment:
     """Robustly parse model JSON output. Malformed or invalid output -> 'unavailable'."""
     try:
-        # Find JSON object in response
-        m = re.search(r"\{[^{}]*\}", raw, re.DOTALL)
-        if not m:
+        text = raw.strip()
+        # Strip markdown code fences if present
+        if text.startswith("```"):
+            lines = text.splitlines()
+            if lines and lines[0].startswith("```"):
+                lines = lines[1:]
+            if lines and lines[-1].strip() == "```":
+                lines = lines[:-1]
+            text = "\n".join(lines).strip()
+
+        data = None
+        # 1. Direct JSON parse
+        if text.startswith("{") and text.endswith("}"):
+            try:
+                data = json.loads(text)
+            except Exception:
+                pass
+
+        # 2. Extract outermost JSON object { ... }
+        if data is None:
+            start = text.find("{")
+            end = text.rfind("}")
+            if start != -1 and end != -1 and end > start:
+                try:
+                    data = json.loads(text[start : end + 1])
+                except Exception:
+                    pass
+
+        # 3. Fallback to searching first JSON-like block
+        if data is None:
+            m = re.search(r"\{[^{}]*\}", text, re.DOTALL)
+            if m:
+                try:
+                    data = json.loads(m.group(0))
+                except Exception:
+                    pass
+
+        if not isinstance(data, dict):
             return Judgment(label="unavailable", rationale="Malformed model output: no JSON object found.")
-        data = json.loads(m.group(0))
 
         label_raw = str(data.get("label", "")).strip().lower()
         if label_raw not in VALID_LABELS:
@@ -56,6 +90,7 @@ def parse_judgment_json(raw: str) -> Judgment:
         return Judgment(label=label_raw, rationale=rationale)  # type: ignore[arg-type]
     except Exception as exc:
         return Judgment(label="unavailable", rationale=f"Malformed model output parse error: {exc}")
+
 
 
 def evaluate_heuristically(claim_text: str, reference_meta: dict, passages: list[str]) -> Judgment:
@@ -132,33 +167,45 @@ Output ONLY a JSON object:
 
     # 1. Anthropic Claude
     if settings.anthropic_api_key:
-        try:
-            resp = await client.post(
-                "https://api.anthropic.com/v1/messages",
-                headers={
-                    "x-api-key": settings.anthropic_api_key,
-                    "anthropic-version": "2023-06-01",
-                    "content-type": "application/json",
-                },
-                json={
-                    "model": "claude-3-5-haiku-20241022",
-                    "max_tokens": 300,
-                    "temperature": 0.0,
-                    "messages": [{"role": "user", "content": prompt}],
-                },
-                timeout=15.0,
-            )
-            if resp.status_code == 200:
-                data = resp.json()
-                content = data.get("content", [])
-                if content and "text" in content[0]:
-                    return content[0]["text"]
-        except Exception as exc:
-            log.warning("Anthropic API call failed: %s", exc)
+        model = settings.llm_model.strip() if settings.llm_model else "claude-3-5-haiku-20241022"
+        for m in [model, "claude-3-haiku-20240307"]:
+            try:
+                resp = await client.post(
+                    "https://api.anthropic.com/v1/messages",
+                    headers={
+                        "x-api-key": settings.anthropic_api_key,
+                        "anthropic-version": "2023-06-01",
+                        "content-type": "application/json",
+                    },
+                    json={
+                        "model": m,
+                        "max_tokens": 300,
+                        "temperature": 0.0,
+                        "messages": [{"role": "user", "content": prompt}],
+                    },
+                    timeout=15.0,
+                )
+                if resp.status_code == 200:
+                    data = resp.json()
+                    content = data.get("content", [])
+                    if content and "text" in content[0]:
+                        return content[0]["text"]
+            except Exception as exc:
+                log.warning("Anthropic API call failed for %s: %s", m, exc)
 
     # 2. Google Gemini
     if settings.gemini_api_key:
-        for model in ("gemini-3.5-flash-lite", "gemini-3.5-flash", "gemini-3.8-flash"):
+        models = [
+            m for m in [
+                settings.llm_model.strip() if settings.llm_model else None,
+                "gemini-3.5-flash-lite",
+                "gemini-3.5-flash",
+                "gemini-2.5-flash",
+                "gemini-2.0-flash",
+                "gemini-1.5-flash",
+            ] if m
+        ]
+        for model in models:
             try:
                 url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={settings.gemini_api_key}"
                 resp = await client.post(
@@ -166,7 +213,11 @@ Output ONLY a JSON object:
                     headers={"Content-Type": "application/json"},
                     json={
                         "contents": [{"parts": [{"text": prompt}]}],
-                        "generationConfig": {"temperature": 0.0, "maxOutputTokens": 512},
+                        "generationConfig": {
+                            "temperature": 0.0,
+                            "maxOutputTokens": 512,
+                            "responseMimeType": "application/json",
+                        },
                     },
                     timeout=15.0,
                 )
@@ -187,6 +238,7 @@ Output ONLY a JSON object:
 
     # 3. OpenAI
     if settings.openai_api_key:
+        model = settings.llm_model.strip() if settings.llm_model else "gpt-4o-mini"
         try:
             resp = await client.post(
                 "https://api.openai.com/v1/chat/completions",
@@ -195,9 +247,10 @@ Output ONLY a JSON object:
                     "Content-Type": "application/json",
                 },
                 json={
-                    "model": "gpt-4o-mini",
+                    "model": model,
                     "temperature": 0.0,
                     "max_tokens": 300,
+                    "response_format": {"type": "json_object"},
                     "messages": [{"role": "user", "content": prompt}],
                 },
                 timeout=15.0,

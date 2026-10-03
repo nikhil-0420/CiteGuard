@@ -13,6 +13,7 @@ class Settings(BaseSettings):
     anthropic_api_key: str = ""
     gemini_api_key: str = ""
     openai_api_key: str = ""
+    llm_model: str = ""
     crossref_mailto: str = ""
     n8n_webhook_url: str = ""
     status_writer: str = "service"  # "service" = audit service writes GitHub status; "n8n" = n8n writes it

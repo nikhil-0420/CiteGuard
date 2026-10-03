@@ -34,8 +34,8 @@ async def run_audit(req: AuditRequest) -> AuditReport:
         max_calls=settings.tool_call_budget,
         deadline_ms=settings.audit_deadline_ms,
     )
-
-    async with httpx.AsyncClient() as client:
+    limits = httpx.Limits(max_keepalive_connections=10, max_connections=20)
+    async with httpx.AsyncClient(limits=limits) as client:
         for idx, claim in enumerate(parsed.claims, start=1):
             fid = f"F-{idx:03d}"
             bib_entry = parsed.bibliography.get(claim.key, {})

@@ -157,7 +157,20 @@ async def fetch_arxiv_metadata(arxiv_id: str, client: httpx.AsyncClient) -> Opti
         return None
 
 
+_ARXIV_DOC_CACHE: dict[str, FullTextDocument] = {}
+_CROSSREF_DOI_CACHE: dict[str, Optional[dict]] = {}
+_CROSSREF_TITLE_CACHE: dict[str, Optional[dict]] = {}
+
+
+def clear_retrieval_cache() -> None:
+    _ARXIV_DOC_CACHE.clear()
+    _CROSSREF_DOI_CACHE.clear()
+    _CROSSREF_TITLE_CACHE.clear()
+
+
 async def fetch_crossref_doi(doi: str, client: httpx.AsyncClient) -> Optional[dict]:
+    if doi in _CROSSREF_DOI_CACHE:
+        return _CROSSREF_DOI_CACHE[doi]
     url = f"https://api.crossref.org/works/{doi}"
     if not url_allowed(url):
         return None
@@ -175,12 +188,17 @@ async def fetch_crossref_doi(doi: str, client: httpx.AsyncClient) -> Optional[di
                 year = int(dp[0][0])
                 break
         authors = [a.get("family", "") for a in msg.get("author", []) if a.get("family")]
-        return {"title": title, "year": year, "authors": authors, "source": "crossref"}
+        res = {"title": title, "year": year, "authors": authors, "source": "crossref"}
+        _CROSSREF_DOI_CACHE[doi] = res
+        return res
     except Exception:
         return None
 
 
 async def query_crossref_title(title: str, client: httpx.AsyncClient) -> Optional[dict]:
+    norm_title = normalize_text(title)
+    if norm_title in _CROSSREF_TITLE_CACHE:
+        return _CROSSREF_TITLE_CACHE[norm_title]
     url = "https://api.crossref.org/works"
     if not url_allowed(url):
         return None
@@ -201,7 +219,9 @@ async def query_crossref_title(title: str, client: httpx.AsyncClient) -> Optiona
                         year = int(dp[0][0])
                         break
                 authors = [a.get("family", "") for a in item.get("author", []) if a.get("family")]
-                return {"title": item_title, "year": year, "authors": authors, "doi": item.get("DOI"), "source": "crossref"}
+                res = {"title": item_title, "year": year, "authors": authors, "doi": item.get("DOI"), "source": "crossref"}
+                _CROSSREF_TITLE_CACHE[norm_title] = res
+                return res
         return None
     except Exception:
         return None
@@ -495,6 +515,15 @@ async def fetch_fulltext(
             reason="Full-text corpus requires arXiv ID",
         )
 
+    if arxiv_id in _ARXIV_DOC_CACHE:
+        doc = _ARXIV_DOC_CACHE[arxiv_id]
+        return doc, AgentStep(
+            step=step_num,
+            action="fetch_fulltext",
+            observation=f"arXiv HTML retrieved, {len(doc.sections)} sections",
+            reason="Need passages from the cited source",
+        )
+
     html_url = f"https://arxiv.org/html/{arxiv_id}"
     if not url_allowed(html_url):
         return None, AgentStep(
@@ -517,6 +546,7 @@ async def fetch_fulltext(
             parser.close()
             raw_text = " ".join(para for _, paras in parser.sections for para in paras)
             doc = FullTextDocument(corpus="arxiv_html", raw_text=raw_text, sections=parser.sections)
+            _ARXIV_DOC_CACHE[arxiv_id] = doc
             return doc, AgentStep(
                 step=step_num,
                 action="fetch_fulltext",

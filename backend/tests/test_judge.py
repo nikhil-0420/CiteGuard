@@ -24,6 +24,12 @@ def test_malformed_llm_output_handled_gracefully():
     assert j4.label == "contradicted"
     assert j4.rationale == "Figure opposes claim"
 
+    # Edge cases: nested braces in rationale string & leading conversation text
+    j5 = parse_judgment_json('Here is my judgment:\n```json\n{"label": "supported", "rationale": "Text states {attention is all you need}."}\n```')
+    assert j5.label == "supported"
+    assert "{attention is all you need}" in j5.rationale
+
+
 
 def test_judge_claim_cases():
     async def _run():
