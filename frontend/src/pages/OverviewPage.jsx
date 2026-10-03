@@ -1,878 +1,639 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { Link, useRouter } from "../router";
 import AppShell from "../components/AppShell";
-import { listReports, getReport } from "../api";
-
+import { listReports } from "../api";
 import { formatDateTime } from "../utils/date";
 import {
-  ShieldIcon,
-  PlusIcon,
+  SearchIcon,
+  FileTextIcon,
   CheckCircleIcon,
   XCircleIcon,
   AlertTriangleIcon,
   AlertOctagonIcon,
-  GitCommitIcon,
-  FileTextIcon,
-  SearchIcon,
-  ArrowLeftIcon,
+  PlusIcon,
   ExternalLinkIcon,
-  FilterIcon } from
-"../components/Icons";
+  ShieldIcon,
+  DatabaseIcon,
+  BookOpenIcon,
+  SettingsIcon,
+  ListIcon,
+} from "../components/Icons";
 
-
-
-
-
-
-
-
-
-
-
-
-const REPORT_METADATA = {
-  blocked: {
-    title: "Agent Brief v1.4 — ResNet & Attention Claims",
-    scenario: "Active Blocker Run",
-    reason: "2 Blocking findings: Contradiction (<2% vs 3.57%) & Identity mismatch (2018 vs 2017)",
-    versionLabel: "v1.4",
-    blockedCount: 2,
-    reviewCount: 3,
-    passedCount: 2,
-    exceptionsCount: 0
+// Static corpus of findings, sources, policies, and actions searchable in CiteGuard
+const CORE_SEARCH_ITEMS = [
+  // ── Findings & Claims ──
+  {
+    id: "finding-f001",
+    category: "Findings",
+    title: "F-001: Attention Is All You Need Claim",
+    subtitle: "The Transformer architecture relies solely on attention mechanisms [@vaswani2017]",
+    meta: "Line 12 · [@vaswani2017] · Vaswani et al. (2017)",
+    href: "/app/audits/blocked?finding=F-001",
+    badge: "PASSED",
+    badgeType: "pass",
+    keywords: "transformer attention vaswani 2017 passed f001",
   },
-  pending: {
-    title: "Transformer Attention Verification — Exception Under Review",
-    scenario: "Reviewer Exception Submitted",
-    reason: "1 Reviewer exception awaiting approval for non-standard citation format",
-    versionLabel: "v1.2",
-    blockedCount: 0,
-    reviewCount: 3,
-    passedCount: 2,
-    exceptionsCount: 1
+  {
+    id: "finding-f002",
+    category: "Findings",
+    title: "F-002: Attention Steps Reference Identity Mismatch",
+    subtitle: "Attention mechanisms reduce training steps significantly [@vaswani2018]",
+    meta: "Line 18 · Identity Mismatch (2018 cited vs 2017 canonical) · Rule CG-EXIST-01",
+    href: "/app/audits/blocked?finding=F-002",
+    badge: "BLOCKED",
+    badgeType: "block",
+    keywords: "identity mismatch vaswani 2018 cg-exist-01 blocked f002",
   },
-  passed: {
-    title: "Attention Is All You Need — Clean Reference Audit",
-    scenario: "Clean Baseline / Approved",
-    reason: "All claims verified against canonical sources; 2 exceptions accepted",
-    versionLabel: "v2.0",
-    blockedCount: 0,
-    reviewCount: 0,
-    passedCount: 5,
-    exceptionsCount: 2
+  {
+    id: "finding-f003",
+    category: "Findings",
+    title: "F-003: ResNet Error Rate Numerical Contradiction",
+    subtitle: "Our ResNet baseline achieves top-5 error rate of < 2% on ImageNet [@he2016]",
+    meta: "Line 24 · Contradiction: Claimed <2% vs Source 3.57% · Rule CG-NUM-01",
+    href: "/app/audits/blocked?finding=F-003",
+    badge: "BLOCKED",
+    badgeType: "block",
+    keywords: "resnet baseline error rate imagenet contradiction 3.57 2 he2016 cg-num-01 f003",
   },
-  error: {
-    title: "Multimodal Agent Draft — Incomplete Extraction",
-    scenario: "Extraction Syntax Error",
-    reason: "Unparseable citation syntax prevented full AST generation",
-    versionLabel: "v0.9-draft",
-    blockedCount: 1,
-    reviewCount: 0,
-    passedCount: 0,
-    exceptionsCount: 0
-  }
-};
+  {
+    id: "finding-f004",
+    category: "Findings",
+    title: "F-004: BERT Universal Scope Discrepancy",
+    subtitle: "BERT outperforms previous methods on all GLUE tasks [@devlin2019]",
+    meta: "Line 31 · Scope Discrepancy: Claimed 'all' vs Source 'eleven' · Rule CG-SCOPE-01",
+    href: "/app/audits/pending?finding=F-004",
+    badge: "REVIEW",
+    badgeType: "review",
+    keywords: "bert glue tasks scope discrepancy all eleven devlin2019 cg-scope-01 f004",
+  },
+  {
+    id: "finding-f005",
+    category: "Findings",
+    title: "F-005: Chain-of-Thought Recent Preprint Grace",
+    subtitle: "Recent preprints on chain-of-thought prompt verification [@wei2024]",
+    meta: "Line 42 · Unindexed recent preprint · Rule CG-EXIST-02",
+    href: "/app/audits/pending?finding=F-005",
+    badge: "REVIEW",
+    badgeType: "review",
+    keywords: "chain of thought wei 2024 unindexed preprint cg-exist-02 f005",
+  },
+
+  // ── Canonical Sources ──
+  {
+    id: "src-vaswani",
+    category: "Sources",
+    title: "Vaswani et al. (2017) — Attention Is All You Need",
+    subtitle: "DOI: 10.48550/arXiv.1706.03762 · Crossref & arXiv resolved",
+    meta: "3 audited occurrences in repository",
+    href: "/app/sources?query=vaswani2017",
+    badge: "RESOLVED",
+    badgeType: "pass",
+    keywords: "vaswani attention transformer 1706.03762 arxiv crossref",
+  },
+  {
+    id: "src-he",
+    category: "Sources",
+    title: "He et al. (2015) — Deep Residual Learning for Image Recognition",
+    subtitle: "DOI: 10.48550/arXiv.1512.03385 · Crossref & arXiv resolved",
+    meta: "2 audited occurrences in repository",
+    href: "/app/sources?query=he2015",
+    badge: "RESOLVED",
+    badgeType: "pass",
+    keywords: "he resnet residual 1512.03385 imagenet crossref",
+  },
+  {
+    id: "src-devlin",
+    category: "Sources",
+    title: "Devlin et al. (2018) — BERT: Pre-training of Deep Bidirectional Transformers",
+    subtitle: "DOI: 10.48550/arXiv.1810.04805 · Crossref & arXiv resolved",
+    meta: "1 audited occurrence in repository",
+    href: "/app/sources?query=devlin2018",
+    badge: "RESOLVED",
+    badgeType: "pass",
+    keywords: "devlin bert transformers 1810.04805 crossref",
+  },
+  {
+    id: "src-crossref",
+    category: "Sources",
+    title: "Crossref Metadata Registry",
+    subtitle: "Primary authority for DOI registration and author/year verification (150M+ records)",
+    meta: "Authority: api.crossref.org",
+    href: "/app/sources",
+    badge: "REGISTRY",
+    badgeType: "neutral",
+    keywords: "crossref registry doi authority",
+  },
+  {
+    id: "src-arxiv",
+    category: "Sources",
+    title: "arXiv Scholarly Repository",
+    subtitle: "Open-access archive for physics, mathematics, and CS preprints (2.4M+ papers)",
+    meta: "Authority: export.arxiv.org/api",
+    href: "/app/sources",
+    badge: "REGISTRY",
+    badgeType: "neutral",
+    keywords: "arxiv registry open access preprints",
+  },
+
+  // ── Policy Rules ──
+  {
+    id: "pol-exist-01",
+    category: "Policies",
+    title: "CG-EXIST-01: Reference Existence & Identity Resolution",
+    subtitle: "Blocks merge gates if cited works cannot be located or fail author/year matching.",
+    meta: "Severity: BLOCK · Automated Enforcer",
+    href: "/app/policies",
+    badge: "RULE",
+    badgeType: "block",
+    keywords: "cg-exist-01 existence identity resolution author year block",
+  },
+  {
+    id: "pol-num-01",
+    category: "Policies",
+    title: "CG-NUM-01: Quantitative & Numerical Discrepancy Rule",
+    subtitle: "Blocks merge gates when claims contradict numeric evidence in canonical source text.",
+    meta: "Severity: BLOCK · Precision Auditor",
+    href: "/app/policies",
+    badge: "RULE",
+    badgeType: "block",
+    keywords: "cg-num-01 numerical contradiction percentage metrics block",
+  },
+  {
+    id: "pol-scope-01",
+    category: "Policies",
+    title: "CG-SCOPE-01: Scope Generalization Bounds",
+    subtitle: "Flags universal claims ('all tasks', 'universally') when source evidence reports limited subsets.",
+    meta: "Severity: REVIEW · Human Sign-off Required",
+    href: "/app/policies",
+    badge: "RULE",
+    badgeType: "review",
+    keywords: "cg-scope-01 scope generalization universal all review",
+  },
+  {
+    id: "pol-human-01",
+    category: "Policies",
+    title: "CG-HUMAN-01: Authorized Reviewer Exception Protocol",
+    subtitle: "Allows allowlisted domain reviewers to accept documented risk with audit trail rationale.",
+    meta: "Severity: EXCEPTION · Security Controlled",
+    href: "/app/policies",
+    badge: "RULE",
+    badgeType: "neutral",
+    keywords: "cg-human-01 reviewer exception allowlist rationale",
+  },
+  {
+    id: "pol-trust-01",
+    category: "Policies",
+    title: "CG-TRUST-01: Prompt Injection Neutralization",
+    subtitle: "Guarantees retrieved source text is treated purely as passive data payloads.",
+    meta: "Severity: DEFENSE · Active Protection",
+    href: "/app/policies",
+    badge: "RULE",
+    badgeType: "pass",
+    keywords: "cg-trust-01 prompt injection neutralization security",
+  },
+
+  // ── Navigation & Actions ──
+  {
+    id: "act-new",
+    category: "Actions",
+    title: "Start a New Research Audit",
+    subtitle: "Submit a Markdown research draft or sync a PR commit for deterministic verification.",
+    meta: "/app/audits/new",
+    href: "/app/audits/new",
+    badge: "ACTION",
+    badgeType: "pass",
+    keywords: "new audit start create submit brief pr commit",
+  },
+  {
+    id: "act-reviews",
+    category: "Actions",
+    title: "Open Review Queue",
+    subtitle: "Review actionable findings awaiting human domain expert assessment.",
+    meta: "/app/reviews · 2 pending items",
+    href: "/app/reviews",
+    badge: "QUEUE",
+    badgeType: "review",
+    keywords: "review queue pending exceptions sign-off",
+  },
+  {
+    id: "act-sources",
+    category: "Actions",
+    title: "Browse Source Library",
+    subtitle: "Explore registered canonical sources, DOIs, and citation occurrences.",
+    meta: "/app/sources",
+    href: "/app/sources",
+    badge: "EXPLORE",
+    badgeType: "neutral",
+    keywords: "source library browse registry papers",
+  },
+  {
+    id: "act-eval",
+    category: "Actions",
+    title: "Evaluation Benchmark Telemetry",
+    subtitle: "Nuroen benchmark accuracy, recall, and verification latency stats.",
+    meta: "/app/results",
+    href: "/app/results",
+    badge: "METRICS",
+    badgeType: "neutral",
+    keywords: "evaluation results benchmarks telemetry accuracy",
+  },
+  {
+    id: "act-settings",
+    category: "Actions",
+    title: "Settings & HMAC Secrets",
+    subtitle: "Manage GitHub webhook webhooks, HMAC signing secrets, and reviewer allowlists.",
+    meta: "/app/settings",
+    href: "/app/settings",
+    badge: "CONFIG",
+    badgeType: "neutral",
+    keywords: "settings hmac webhooks allowlist config",
+  },
+  {
+    id: "act-methodology",
+    category: "Actions",
+    title: "Inspection Methodology Specification",
+    subtitle: "Read the public 5-stage verification pipeline and deterministic policy bounds.",
+    meta: "/methodology",
+    href: "/methodology",
+    badge: "DOCS",
+    badgeType: "neutral",
+    keywords: "methodology documentation specification bounds pipeline",
+  },
+];
 
 export default function OverviewPage() {
   const router = useRouter();
+  const searchInputRef = useRef(null);
   const [reports, setReports] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [selectedAuditId, setSelectedAuditId] = useState(null);
-  const [previewReport, setPreviewReport] = useState(null);
-
-  // Filters
-  const [period, setPeriod] = useState("all");
-  const [repoFilter, setRepoFilter] = useState("all");
-  const [gateFilter, setGateFilter] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
-  const [lastRefreshed, setLastRefreshed] = useState(() => formatDateTime(new Date().toISOString()));
-
-  const loadData = () => {
-    setIsLoading(true);
-    listReports().
-    then((raw) => {
-      const augmented = raw.map((r) => {
-        const meta = REPORT_METADATA[r.report_id] || {
-          title: `Audit ${r.report_id} (${r.repo})`,
-          scenario: "Custom Audit Run",
-          reason: r.gate_state === "failure" ? "Blocking finding detected" : "Audit complete",
-          versionLabel: "v1.0",
-          blockedCount: r.gate_state === "failure" ? 1 : 0,
-          reviewCount: r.gate_state === "pending" ? 1 : 0,
-          passedCount: r.gate_state === "success" ? 1 : 0,
-          exceptionsCount: 0
-        };
-        return { ...r, ...meta };
-      });
-      setReports(augmented);
-      setIsLoading(false);
-      setLastRefreshed(formatDateTime(new Date().toISOString()));
-    }).
-    catch(() => setIsLoading(false));
-  };
+  const [isFocused, setIsFocused] = useState(false);
+  const [activeTab, setActiveTab] = useState("all"); // 'all' | 'audits' | 'findings' | 'sources' | 'policies'
+  const [selectedIndex, setSelectedIndex] = useState(0);
 
   useEffect(() => {
-    loadData();
+    listReports()
+      .then((raw) => {
+        setReports(raw);
+        setIsLoading(false);
+      })
+      .catch(() => setIsLoading(false));
   }, []);
 
-  // Fetch preview detail when a row is selected
+  // Global Ctrl+K / Cmd+K focuses the main centric search bar
   useEffect(() => {
-    if (selectedAuditId) {
-      getReport(selectedAuditId).
-      then((data) => setPreviewReport(data)).
-      catch(() => setPreviewReport(null));
-    } else {
-      setPreviewReport(null);
-    }
-  }, [selectedAuditId]);
-
-  // Unique repositories for selector
-  const availableRepos = useMemo(() => {
-    const set = new Set();
-    reports.forEach((r) => set.add(r.repo));
-    return Array.from(set);
-  }, [reports]);
-
-  // Filtered dataset
-  const filteredReports = useMemo(() => {
-    return reports.filter((r) => {
-      if (repoFilter !== "all" && r.repo !== repoFilter) return false;
-      if (gateFilter === "failure" && r.gate_state !== "failure") return false;
-      if (gateFilter === "pending" && r.gate_state !== "pending") return false;
-      if (gateFilter === "success" && r.gate_state !== "success") return false;
-      if (gateFilter === "exceptions" && r.exceptionsCount === 0) return false;
-      if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase();
-        const matchesTitle = r.title.toLowerCase().includes(q);
-        const matchesRepo = r.repo.toLowerCase().includes(q);
-        const matchesSha = r.commit_sha.toLowerCase().includes(q);
-        const matchesReason = r.reason.toLowerCase().includes(q);
-        if (!matchesTitle && !matchesRepo && !matchesSha && !matchesReason) return false;
-      }
-      return true;
-    });
-  }, [reports, repoFilter, gateFilter, searchQuery]);
-
-  // Derived metrics — counts audits, not individual findings
-  const metrics = useMemo(() => {
-    let totalAudits = filteredReports.length;
-    let blockingAudits = 0;
-    let reviewAudits = 0;
-    let passedAudits = 0;
-    let exceptionsAudits = 0;
-
-    filteredReports.forEach((r) => {
-      if (r.gate_state === "failure") blockingAudits++;
-      if (r.gate_state === "pending") reviewAudits++;
-      if (r.gate_state === "success") passedAudits++;
-      if (r.exceptionsCount > 0) exceptionsAudits++;
-    });
-
-    return { totalAudits, blockingAudits, reviewAudits, passedAudits, exceptionsAudits };
-  }, [filteredReports]);
-
-  // "Needs attention" queue: failure or pending items
-  const attentionQueue = useMemo(() => {
-    return filteredReports.filter((r) => r.gate_state === "failure" || r.gate_state === "pending");
-  }, [filteredReports]);
-
-  // Recent activity events
-  const activityEvents = [
-  {
-    id: "ev-1",
-    action: "Review exception recorded",
-    actor: "Sam (@sam)",
-    target: "F-001 (Attention Is All You Need)",
-    time: "10 mins ago",
-    reportId: "pending"
-  },
-  {
-    id: "ev-2",
-    action: "Gate check failed (2 blockers)",
-    actor: "CiteGuard Bot",
-    target: "PR #1 (commit 9f3c2a1)",
-    time: "45 mins ago",
-    reportId: "blocked"
-  },
-  {
-    id: "ev-3",
-    action: "Audit passed & check posted",
-    actor: "CiteGuard Bot",
-    target: "PR #7 (commit 4d1c9f2)",
-    time: "2 hours ago",
-    reportId: "passed"
-  }];
-
-
-  const getGateBadge = (state) => {
-    const styles = {
-      success: {
-        bg: "var(--cg-pass-subtle)",
-        color: "var(--cg-pass)",
-        border: "var(--cg-pass-line)",
-        label: "Passed",
-        icon: <CheckCircleIcon size={11} />
-      },
-      failure: {
-        bg: "var(--cg-block-subtle)",
-        color: "var(--cg-block)",
-        border: "var(--cg-block-line)",
-        label: "Blocked",
-        icon: <XCircleIcon size={11} />
-      },
-      pending: {
-        bg: "var(--cg-review-subtle)",
-        color: "var(--cg-review)",
-        border: "var(--cg-review-line)",
-        label: "Needs Review",
-        icon: <AlertTriangleIcon size={11} />
-      },
-      error: {
-        bg: "var(--cg-block-subtle)",
-        color: "var(--cg-block)",
-        border: "var(--cg-block-line)",
-        label: "Error",
-        icon: <AlertOctagonIcon size={11} />
+    const handleKeyDown = (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+        setIsFocused(true);
       }
     };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
 
-    const s = styles[state];
-    if (!s) return null;
-    return (
-      <span
-        className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold"
-        style={{ background: s.bg, color: s.color, border: `1px solid ${s.border}` }}>
-        
-        {s.icon}
-        <span>{s.label}</span>
-      </span>);
+  // Map reports into searchable audit items
+  const auditSearchItems = useMemo(() => {
+    return reports.map((r) => {
+      const gateState = r.gate_state || "failure";
+      let badge = "BLOCKED";
+      let badgeType = "block";
+      if (gateState === "success") {
+        badge = "PASSED";
+        badgeType = "pass";
+      } else if (gateState === "pending") {
+        badge = "REVIEW";
+        badgeType = "review";
+      } else if (gateState === "error") {
+        badge = "ERROR";
+        badgeType = "block";
+      }
 
+      return {
+        id: `audit-${r.report_id}`,
+        category: "Audits",
+        title: `Audit: ${r.report_id}`,
+        subtitle: `${r.repo} · PR #${r.pr_number || 1} · SHA ${r.commit_sha?.slice(0, 7) || "latest"}`,
+        meta: r.generated_at ? formatDateTime(r.generated_at, true) : "Recent Run",
+        href: `/app/audits/${r.report_id}`,
+        badge,
+        badgeType,
+        keywords: `${r.report_id} ${r.repo} ${r.commit_sha} ${gateState} audit`,
+      };
+    });
+  }, [reports]);
+
+  // Combined master search items
+  const allItems = useMemo(() => {
+    return [...auditSearchItems, ...CORE_SEARCH_ITEMS];
+  }, [auditSearchItems]);
+
+  // Filtered results based on search query and category tab
+  const filteredResults = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+
+    return allItems.filter((item) => {
+      // Category tab filtering
+      if (activeTab === "audits" && item.category !== "Audits") return false;
+      if (activeTab === "findings" && item.category !== "Findings") return false;
+      if (activeTab === "sources" && item.category !== "Sources") return false;
+      if (activeTab === "policies" && item.category !== "Policies") return false;
+      if (activeTab === "actions" && item.category !== "Actions") return false;
+
+      // Text query filtering
+      if (!q) return true;
+
+      const haystack = `${item.title} ${item.subtitle} ${item.meta} ${item.category} ${item.keywords || ""}`.toLowerCase();
+      return haystack.includes(q);
+    });
+  }, [allItems, searchQuery, activeTab]);
+
+  // Keep selected index within bounds
+  useEffect(() => {
+    setSelectedIndex(0);
+  }, [filteredResults]);
+
+  // Keyboard navigation within search dropdown
+  const handleKeyDown = (e) => {
+    if (!isFocused && !searchQuery) return;
+
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setSelectedIndex((prev) => (prev + 1) % Math.max(1, filteredResults.length));
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setSelectedIndex((prev) => (prev - 1 + filteredResults.length) % Math.max(1, filteredResults.length));
+    } else if (e.key === "Enter" && filteredResults[selectedIndex]) {
+      e.preventDefault();
+      router.navigate(filteredResults[selectedIndex].href);
+      setIsFocused(false);
+    } else if (e.key === "Escape") {
+      setIsFocused(false);
+      searchInputRef.current?.blur();
+    }
   };
+
+  const getBadgeStyle = (type) => {
+    switch (type) {
+      case "pass":
+        return "bg-[#F4FAED] text-[#166534] border-[#18280E]/15";
+      case "block":
+        return "bg-[#FEF2F2] text-[#991B1B] border-[#FECACA]";
+      case "review":
+        return "bg-[#FFFBEB] text-[#B45309] border-[#FDE68A]";
+      default:
+        return "bg-[#F4FAED] text-[#5C6854] border-[#18280E]/10";
+    }
+  };
+
+  const getCategoryIcon = (category) => {
+    switch (category) {
+      case "Audits":
+        return <FileTextIcon size={14} className="text-[#18280E]" />;
+      case "Findings":
+        return <ShieldIcon size={14} className="text-[#B45309]" />;
+      case "Sources":
+        return <DatabaseIcon size={14} className="text-[#5C6854]" />;
+      case "Policies":
+        return <BookOpenIcon size={14} className="text-[#166534]" />;
+      case "Actions":
+      default:
+        return <PlusIcon size={14} className="text-[#18280E]" />;
+    }
+  };
+
+  // Quick action shortcut pills shown below the search bar
+  const quickActions = [
+    { label: "New Audit", href: "/app/audits/new", icon: PlusIcon },
+    { label: "All Audits", href: "/app/audits", icon: FileTextIcon },
+    { label: "Review Queue", href: "/app/reviews", icon: AlertTriangleIcon },
+    { label: "Source Library", href: "/app/sources", icon: ExternalLinkIcon },
+  ];
+
+  const showDropdown = isFocused || searchQuery.trim().length > 0;
 
   return (
     <AppShell breadcrumbs={[{ label: "Overview" }]}>
-      <div className="p-6 md:p-8 space-y-6 max-w-7xl mx-auto">
-        {/* ── Header & Filter Controls ── */}
-        <div
-          className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4"
-          style={{ borderBottom: "1px solid var(--cg-line)" }}>
-          
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight" style={{ color: "var(--cg-ink)" }}>
-              Workspace Overview
-            </h1>
-            <p className="text-xs mt-0.5" style={{ color: "var(--cg-ink-secondary)" }}>
-              Active audit gates, pending reviewer exceptions, and verification analytics.
-            </p>
+      <div className="flex-1 flex flex-col items-center justify-center min-h-[calc(100vh-56px)] px-4 py-8 relative">
+        {/* ── Brand Mark & Centric Greeting ── */}
+        <div className="flex flex-col items-center mb-7 animate-fade-in text-center">
+          <div className="w-13 h-13 rounded-2xl bg-[#18280E] flex items-center justify-center mb-4 shadow-sm">
+            <ShieldIcon size={26} className="text-[#B2EB76]" />
           </div>
-
-          <div className="flex flex-wrap items-center gap-3">
-            {/* Repository Filter */}
-            <select
-              value={repoFilter}
-              onChange={(e) => setRepoFilter(e.target.value)}
-              className="text-xs font-medium rounded-md px-2.5 py-1.5 outline-none"
-              aria-label="Filter by repository"
-              style={{
-                background: "var(--cg-surface)",
-                color: "var(--cg-ink)",
-                border: "1px solid var(--cg-line)"
-              }}>
-              
-              <option value="all">All repositories ({reports.length})</option>
-              {availableRepos.map((repo) =>
-              <option key={repo} value={repo}>{repo}</option>
-              )}
-            </select>
-
-            {/* Period Selector */}
-            <div
-              className="flex items-center rounded-md p-0.5 text-xs"
-              style={{ background: "var(--cg-surface)", border: "1px solid var(--cg-line)" }}>
-              
-              {["7d", "30d", "all"].map((p) =>
-              <button
-                key={p}
-                type="button"
-                onClick={() => setPeriod(p)}
-                className="px-2.5 py-1 rounded font-medium transition-colors"
-                style={{
-                  background: period === p ? "var(--cg-surface)" : "transparent",
-                  color: period === p ? "#fff" : "var(--cg-ink-secondary)"
-                }}>
-                
-                  {p === "all" ? "All time" : p}
-                </button>
-              )}
-            </div>
-
-            {/* Refresh */}
-            <button
-              type="button"
-              onClick={loadData}
-              className="text-xs font-medium rounded-md px-2.5 py-1.5 transition-colors"
-              title={`Last refreshed at ${lastRefreshed}`}
-              style={{
-                background: "var(--cg-surface)",
-                color: "var(--cg-ink-secondary)",
-                border: "1px solid var(--cg-line)"
-              }}>
-              
-              ↻ Refresh
-            </button>
-          </div>
+          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-[-0.03em] text-[#090F05]">
+            What would you like to audit?
+          </h1>
+          <p className="text-xs sm:text-sm text-[#5C6854] mt-2 font-mono max-w-md">
+            The main deterministic search: inspect audits, claims, sources, and policies.
+          </p>
         </div>
 
-        {/* ── Metric Cards (Click-to-Filter) ── */}
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 stagger">
-          {[
-          { key: "all", label: "Total Audits", value: metrics.totalAudits, sub: "All reports", color: "var(--cg-accent)" },
-          { key: "failure", label: "Blocked", value: metrics.blockingAudits, sub: "Blocks merge gate", color: "var(--cg-block)" },
-          { key: "pending", label: "Needs Review", value: metrics.reviewAudits, sub: "Awaiting sign-off", color: "var(--cg-review)" },
-          { key: "success", label: "Passed", value: metrics.passedAudits, sub: "Verified", color: "var(--cg-pass)" },
-          { key: "exceptions", label: "Exceptions", value: metrics.exceptionsAudits, sub: "Reviewer overrides", color: "var(--cg-accent)" }].
-          map((card) => {
-            const isActive = gateFilter === card.key;
-            return (
-              <button
-                key={card.key}
-                type="button"
-                onClick={() => setGateFilter(isActive && card.key !== "all" ? "all" : card.key)}
-                className="text-left p-3.5 rounded-lg transition-all animate-fade-in"
-                style={{
-                  background: isActive ? "var(--cg-surface)" : "var(--cg-surface)",
-                  border: `1px solid ${isActive ? card.color : "var(--cg-line)"}`,
-                  boxShadow: isActive ? `0 0 0 1px ${card.color}` : "none"
-                }}>
-                
-                <div
-                  className="text-[10px] font-mono uppercase tracking-wider font-semibold"
-                  style={{ color: card.color }}>
-                  
-                  {card.label}
-                </div>
-                <div className="text-2xl font-bold mt-1" style={{ color: "var(--cg-ink)" }}>
-                  {card.value}
-                </div>
-                <div className="text-[11px] mt-0.5" style={{ color: "var(--cg-ink-muted)" }}>
-                  {card.sub}
-                </div>
-              </button>);
+        {/* ── Main Centric Search Bar ── */}
+        <div className="w-full max-w-2xl relative z-40 animate-slide-up" style={{ animationDelay: "60ms" }}>
+          <div
+            className={`relative flex items-center rounded-2xl border-2 transition-all duration-200 bg-white ${
+              isFocused
+                ? "border-[#18280E] shadow-[0_4px_24px_rgba(24,40,14,0.12)]"
+                : "border-[#18280E]/15 shadow-sm hover:border-[#18280E]/30"
+            }`}
+          >
+            <SearchIcon
+              size={20}
+              className={`absolute left-5 transition-colors ${
+                isFocused ? "text-[#18280E]" : "text-[#8A9684]"
+              }`}
+            />
+            <input
+              ref={searchInputRef}
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onFocus={() => setIsFocused(true)}
+              onKeyDown={handleKeyDown}
+              placeholder="Search all audits, findings, sources, policies..."
+              className="w-full pl-14 pr-24 py-4 text-base bg-transparent outline-none text-[#090F05] placeholder-[#8A9684] font-medium"
+              autoComplete="off"
+              spellCheck="false"
+            />
+            <div className="absolute right-3.5 flex items-center gap-2">
+              {searchQuery ? (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery("")}
+                  className="p-1 rounded-md text-[#8A9684] hover:text-[#090F05] hover:bg-[#F4FAED] transition-colors cursor-pointer"
+                  title="Clear search"
+                >
+                  <span className="text-xs font-mono font-bold">✕</span>
+                </button>
+              ) : null}
+              <kbd className="hidden sm:inline-flex items-center gap-1 px-2 py-1 text-[11px] font-mono font-medium rounded-lg bg-[#F4FAED] border border-[#18280E]/12 text-[#5C6854]">
+                ⌘K
+              </kbd>
+            </div>
+          </div>
 
+          {/* ── Comprehensive Search List Dropdown ── */}
+          {showDropdown && (
+            <>
+              {/* Invisible backdrop to dismiss when clicking outside */}
+              <div
+                className="fixed inset-0 z-40"
+                onClick={() => setIsFocused(false)}
+              />
+
+              <div className="absolute top-full left-0 right-0 mt-2.5 rounded-2xl bg-white border border-[#18280E]/15 shadow-2xl overflow-hidden z-50 animate-scale-in">
+                {/* Category Filter Tabs */}
+                <div className="px-4 py-2.5 bg-[#FAFBF9] border-b border-[#18280E]/10 flex items-center gap-1.5 overflow-x-auto text-xs font-mono">
+                  {[
+                    { id: "all", label: "All Items" },
+                    { id: "audits", label: "Audits" },
+                    { id: "findings", label: "Findings" },
+                    { id: "sources", label: "Sources" },
+                    { id: "policies", label: "Policies" },
+                    { id: "actions", label: "Actions" },
+                  ].map((tab) => (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      onClick={() => setActiveTab(tab.id)}
+                      className={`px-3 py-1 rounded-full text-[11px] font-medium transition-colors whitespace-nowrap cursor-pointer ${
+                        activeTab === tab.id
+                          ? "bg-[#18280E] text-[#B2EB76] font-semibold"
+                          : "text-[#5C6854] hover:text-[#090F05] hover:bg-[#F4FAED]"
+                      }`}
+                    >
+                      {tab.label}
+                    </button>
+                  ))}
+                  <div className="ml-auto text-[10px] text-[#8A9684] shrink-0 hidden sm:block">
+                    {filteredResults.length} item{filteredResults.length !== 1 ? "s" : ""}
+                  </div>
+                </div>
+
+                {/* Results List */}
+                <div className="max-h-80 overflow-y-auto divide-y divide-[#18280E]/6 p-1">
+                  {filteredResults.length === 0 ? (
+                    <div className="px-5 py-8 text-center">
+                      <p className="text-xs text-[#5C6854] font-mono">
+                        No matches found for "{searchQuery}"
+                      </p>
+                      <Link
+                        href="/app/audits/new"
+                        className="inline-flex items-center gap-1.5 mt-3 text-xs font-mono font-medium text-[#18280E] hover:underline"
+                        onClick={() => setIsFocused(false)}
+                      >
+                        <PlusIcon size={12} />
+                        <span>Start a new audit instead →</span>
+                      </Link>
+                    </div>
+                  ) : (
+                    filteredResults.map((item, idx) => {
+                      const isSelected = idx === selectedIndex;
+                      return (
+                        <div
+                          key={item.id}
+                          onMouseEnter={() => setSelectedIndex(idx)}
+                          onClick={() => {
+                            router.navigate(item.href);
+                            setIsFocused(false);
+                          }}
+                          className={`flex items-start gap-3 px-4 py-3 rounded-xl cursor-pointer transition-colors ${
+                            isSelected
+                              ? "bg-[#F4FAED] text-[#090F05]"
+                              : "hover:bg-[#F8FAF6] text-[#090F05]"
+                          }`}
+                        >
+                          <div className="mt-0.5 w-6 h-6 rounded-lg bg-[#FAFBF9] border border-[#18280E]/10 flex items-center justify-center shrink-0">
+                            {getCategoryIcon(item.category)}
+                          </div>
+
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-bold text-[#090F05] truncate">
+                                {item.title}
+                              </span>
+                              <span className="text-[9px] font-mono uppercase tracking-wider px-1.5 py-0.2 rounded bg-white text-[#5C6854] border border-[#18280E]/10 shrink-0">
+                                {item.category}
+                              </span>
+                            </div>
+                            <div className="text-[11px] text-[#5C6854] truncate mt-0.5">
+                              {item.subtitle}
+                            </div>
+                            {item.meta && (
+                              <div className="text-[10px] font-mono text-[#8A9684] truncate mt-0.5">
+                                {item.meta}
+                              </div>
+                            )}
+                          </div>
+
+                          {item.badge && (
+                            <span
+                              className={`text-[9px] font-mono font-bold px-2 py-0.5 rounded-full border shrink-0 ${getBadgeStyle(
+                                item.badgeType
+                              )}`}
+                            >
+                              {item.badge}
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+
+                {/* Footer hint */}
+                <div className="px-4 py-2 bg-[#FAFBF9] border-t border-[#18280E]/10 flex items-center justify-between text-[10px] font-mono text-[#8A9684]">
+                  <span>Navigate with ↑ / ↓ and Enter</span>
+                  <span>ESC to close</span>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* ── Quick Action Shortcuts ── */}
+        <div
+          className="flex flex-wrap items-center justify-center gap-2.5 mt-8 animate-slide-up"
+          style={{ animationDelay: "120ms" }}
+        >
+          {quickActions.map((action) => {
+            const Icon = action.icon;
+            return (
+              <Link
+                key={action.label}
+                href={action.href}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-full text-xs font-medium bg-[#F4FAED] border border-[#18280E]/10 text-[#090F05] hover:border-[#18280E]/25 hover:bg-[#E8F2DF] transition-all cursor-pointer"
+              >
+                <Icon size={13} className="text-[#5C6854]" />
+                <span>{action.label}</span>
+              </Link>
+            );
           })}
         </div>
 
-        {/* ── Needs Attention Queue ── */}
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <h2 className="text-base font-bold" style={{ color: "var(--cg-ink)" }}>
-                Needs Attention
-              </h2>
-              <span
-                className="text-[11px] font-mono font-semibold px-2 py-0.5 rounded-full"
-                style={{
-                  background: "var(--cg-block-subtle)",
-                  color: "var(--cg-block)",
-                  border: "1px solid var(--cg-block-line)"
-                }}>
-                
-                {attentionQueue.length} actionable
-              </span>
-            </div>
-            <Link
-              href="/app/reviews"
-              className="text-xs font-semibold hover:opacity-70 transition-opacity"
-              style={{ color: "var(--cg-accent)" }}>
-              
-              View full review queue →
-            </Link>
-          </div>
-
-          {attentionQueue.length === 0 ?
+        {/* ── Summary Stats Strip ── */}
+        {!isLoading && reports.length > 0 && (
           <div
-            className="p-8 text-center rounded-lg text-xs"
-            style={{
-              background: "var(--cg-surface)",
-              border: "1px solid var(--cg-line)",
-              color: "var(--cg-ink-secondary)"
-            }}>
-            
-              No blocked reports or unresolved findings in the selected view.
-            </div> :
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 stagger">
-              {attentionQueue.map((item) =>
-            <div
-              key={item.report_id}
-              className="p-4 rounded-lg flex flex-col justify-between space-y-3 transition-all animate-fade-in"
-              style={{
-                background: "var(--cg-surface)",
-                border: "1px solid var(--cg-line)"
-              }}>
-              
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[11px] font-mono" style={{ color: "var(--cg-ink-secondary)" }}>
-                        PR #{item.pr_number} · {item.repo}
-                      </span>
-                      {getGateBadge(item.gate_state)}
-                    </div>
-
-                    <div className="text-sm font-bold leading-snug" style={{ color: "var(--cg-ink)" }}>
-                      {item.title}
-                    </div>
-
-                    <p
-                  className="text-xs leading-relaxed p-2 rounded"
-                  style={{
-                    background: "var(--cg-surface-subtle)",
-                    border: "1px solid var(--cg-line)",
-                    color: "var(--cg-ink-secondary)"
-                  }}>
-                  
-                      <strong style={{ color: "var(--cg-block)" }}>Issue:</strong> {item.reason}
-                    </p>
-                  </div>
-
-                  <div
-                className="pt-2 flex items-center justify-between text-xs"
-                style={{ borderTop: "1px solid var(--cg-line)" }}>
-                
-                    <div className="flex items-center gap-2 font-mono text-[11px]" style={{ color: "var(--cg-ink-secondary)" }}>
-                      <span>SHA: {item.commit_sha.slice(0, 7)}</span>
-                      <span>·</span>
-                      <span>{item.versionLabel}</span>
-                    </div>
-
-                    <Link
-                  href={`/app/audits/${item.report_id}?finding=${item.gate_state === "failure" ? "F-003" : "F-004"}`}
-                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded text-xs font-semibold text-white transition-colors"
-                  style={{ background: "var(--cg-surface)" }}>
-                  
-                      <span>Open evidence</span>
-                      <span>→</span>
-                    </Link>
-                  </div>
-                </div>
-            )}
-            </div>
-          }
-        </div>
-
-        {/* ── Analytics: Outcome Bar + Activity ── */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          {/* Stacked Outcome Distribution */}
-          <div
-            className="lg:col-span-7 rounded-lg p-5 space-y-4"
-            style={{
-              background: "var(--cg-surface)",
-              border: "1px solid var(--cg-line)"
-            }}>
-            
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-sm font-bold" style={{ color: "var(--cg-ink)" }}>
-                  Audit Outcome Breakdown
-                </h3>
-                <p className="text-xs" style={{ color: "var(--cg-ink-secondary)" }}>
-                  Gate status distribution ({period === "all" ? "All time" : period}).
-                </p>
-              </div>
-              {gateFilter !== "all" &&
-              <button
-                type="button"
-                onClick={() => setGateFilter("all")}
-                className="text-xs font-medium hover:opacity-70 transition-opacity"
-                style={{ color: "var(--cg-accent)" }}>
-                
-                  Clear filter
-                </button>
-              }
-            </div>
-
-            {/* Visual Stacked Bar */}
-            <div className="space-y-2">
-              <div
-                className="h-7 w-full rounded-md overflow-hidden flex"
-                style={{ background: "var(--cg-surface-subtle)", border: "1px solid var(--cg-line)" }}>
-                
-                {metrics.totalAudits > 0 ?
-                <>
-                    <div
-                    style={{ width: `${metrics.blockingAudits / metrics.totalAudits * 100}%`, background: "var(--cg-block)" }}
-                    className="flex items-center justify-center text-[11px] font-bold text-white font-mono cursor-pointer hover:opacity-90 transition-opacity"
-                    title={`Blocked: ${metrics.blockingAudits} audits`}
-                    onClick={() => setGateFilter("failure")}>
-                    
-                      {metrics.blockingAudits > 0 ? metrics.blockingAudits : ""}
-                    </div>
-                    <div
-                    style={{ width: `${metrics.reviewAudits / metrics.totalAudits * 100}%`, background: "var(--cg-review)" }}
-                    className="flex items-center justify-center text-[11px] font-bold text-white font-mono cursor-pointer hover:opacity-90 transition-opacity"
-                    title={`Review: ${metrics.reviewAudits} audits`}
-                    onClick={() => setGateFilter("pending")}>
-                    
-                      {metrics.reviewAudits > 0 ? metrics.reviewAudits : ""}
-                    </div>
-                    <div
-                    style={{ width: `${metrics.passedAudits / metrics.totalAudits * 100}%`, background: "var(--cg-pass)" }}
-                    className="flex items-center justify-center text-[11px] font-bold text-white font-mono cursor-pointer hover:opacity-90 transition-opacity"
-                    title={`Passed: ${metrics.passedAudits} audits`}
-                    onClick={() => setGateFilter("success")}>
-                    
-                      {metrics.passedAudits > 0 ? metrics.passedAudits : ""}
-                    </div>
-                  </> :
-
-                <div className="w-full flex items-center justify-center text-xs" style={{ color: "var(--cg-ink-secondary)" }}>
-                    No audits matching current filters
-                  </div>
-                }
-              </div>
-
-              {/* Legend */}
-              <div className="flex flex-wrap items-center justify-between text-xs" style={{ color: "var(--cg-ink-secondary)" }}>
-                {[
-                { label: "Blocked", count: metrics.blockingAudits, color: "var(--cg-block)", filter: "failure" },
-                { label: "Needs Review", count: metrics.reviewAudits, color: "var(--cg-review)", filter: "pending" },
-                { label: "Passed", count: metrics.passedAudits, color: "var(--cg-pass)", filter: "success" },
-                { label: "Exceptions", count: metrics.exceptionsAudits, color: "var(--cg-accent)", filter: "exceptions" }].
-                map((item) =>
-                <button
-                  key={item.label}
-                  type="button"
-                  className="flex items-center gap-1.5 cursor-pointer hover:opacity-70 transition-opacity"
-                  onClick={() => setGateFilter(item.filter)}>
-                  
-                    <span className="w-2.5 h-2.5 rounded" style={{ background: item.color }} />
-                    <span>{item.label} ({item.count})</span>
-                  </button>
-                )}
-              </div>
-            </div>
-
-            <p
-              className="text-[11px] pt-2"
-              style={{ color: "var(--cg-ink-muted)", borderTop: "1px solid var(--cg-line)" }}>
-              
-              Click any bar segment or legend item to filter the table below.
-            </p>
+            className="flex flex-wrap items-center justify-center gap-4 sm:gap-6 mt-9 text-[11px] font-mono text-[#8A9684] animate-fade-in"
+            style={{ animationDelay: "200ms" }}
+          >
+            <span>{reports.length} total audits</span>
+            <span className="w-px h-3 bg-[#18280E]/10 hidden sm:block" />
+            <span className="text-[#991B1B]">
+              {reports.filter((r) => r.gate_state === "failure").length} blocked
+            </span>
+            <span className="w-px h-3 bg-[#18280E]/10 hidden sm:block" />
+            <span className="text-[#B45309]">
+              {reports.filter((r) => r.gate_state === "pending").length} in review
+            </span>
+            <span className="w-px h-3 bg-[#18280E]/10 hidden sm:block" />
+            <span className="text-[#166534]">
+              {reports.filter((r) => r.gate_state === "success").length} passed
+            </span>
           </div>
-
-          {/* Activity Stream */}
-          <div
-            className="lg:col-span-5 rounded-lg p-5 space-y-4"
-            style={{
-              background: "var(--cg-surface)",
-              border: "1px solid var(--cg-line)"
-            }}>
-            
-            <h3 className="text-sm font-bold" style={{ color: "var(--cg-ink)" }}>Recent Audit Events</h3>
-            <div style={{ borderColor: "var(--cg-line)" }}>
-              {activityEvents.map((ev, i) =>
-              <div
-                key={ev.id}
-                onClick={() => router.navigate(`/app/audits/${ev.reportId}`)}
-                className="py-2.5 flex items-start justify-between cursor-pointer -mx-2 px-2 rounded transition-colors"
-                style={{
-                  borderBottom: i < activityEvents.length - 1 ? "1px solid var(--cg-line)" : "none"
-                }}>
-                
-                  <div className="min-w-0 pr-2">
-                    <div className="text-xs font-semibold truncate" style={{ color: "var(--cg-ink)" }}>{ev.action}</div>
-                    <div className="text-[11px] truncate" style={{ color: "var(--cg-ink-secondary)" }}>
-                      {ev.actor} on {ev.target}
-                    </div>
-                  </div>
-                  <span className="text-[10px] font-mono shrink-0" style={{ color: "var(--cg-ink-muted)" }}>{ev.time}</span>
-                </div>
-              )}
-            </div>
-            <div>
-              <span className="text-[11px] font-mono" style={{ color: "var(--cg-ink-muted)" }}>
-                Log stream synced with GitHub PR commit events.
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {/* ── Reports Table ── */}
-        <div
-          className="rounded-lg overflow-hidden"
-          style={{
-            background: "var(--cg-surface)",
-            border: "1px solid var(--cg-line)"
-          }}>
-          
-          {/* Table Toolbar */}
-          <div
-            className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
-            style={{
-              background: "var(--cg-surface-subtle)",
-              borderBottom: "1px solid var(--cg-line)"
-            }}>
-            
-            <div className="flex items-center gap-2">
-              <h2 className="text-sm font-bold" style={{ color: "var(--cg-ink)" }}>Evaluated Reports & Runs</h2>
-              <span className="text-xs font-mono" style={{ color: "var(--cg-ink-secondary)" }}>({filteredReports.length})</span>
-            </div>
-
-            <div className="flex items-center gap-3">
-              <div className="relative">
-                <SearchIcon
-                  size={13}
-                  className="absolute left-2.5 top-1/2 -translate-y-1/2"
-                  style={{ color: "var(--cg-ink-muted)" }} />
-                
-                <input
-                  type="text"
-                  placeholder="Filter by title, SHA, repo..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-8 pr-3 py-1.5 text-xs rounded-md w-64 outline-none"
-                  style={{
-                    background: "var(--cg-surface)",
-                    border: "1px solid var(--cg-line)",
-                    color: "var(--cg-ink)"
-                  }} />
-                
-              </div>
-
-              {gateFilter !== "all" &&
-              <button
-                type="button"
-                onClick={() => setGateFilter("all")}
-                className="text-xs font-medium hover:opacity-70 transition-opacity"
-                style={{ color: "var(--cg-accent)" }}>
-                
-                  Reset filter
-                </button>
-              }
-            </div>
-          </div>
-
-          {/* Table */}
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse text-xs">
-              <thead>
-                <tr
-                  className="text-[10px] font-mono uppercase tracking-wider"
-                  style={{
-                    background: "var(--cg-surface-subtle)",
-                    color: "var(--cg-ink-secondary)",
-                    borderBottom: "1px solid var(--cg-line)"
-                  }}>
-                  
-                  <th className="py-2.5 px-4 font-semibold">Report Title & Run</th>
-                  <th className="py-2.5 px-4 font-semibold">Repository / PR</th>
-                  <th className="py-2.5 px-4 font-semibold">Gate Status</th>
-                  <th className="py-2.5 px-4 font-semibold">Findings</th>
-                  <th className="py-2.5 px-4 font-semibold">Evaluated</th>
-                  <th className="py-2.5 px-4 text-right font-semibold">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredReports.length === 0 ?
-                <tr>
-                    <td colSpan={6} className="py-8 text-center" style={{ color: "var(--cg-ink-secondary)" }}>
-                      No audit runs found matching current filter parameters.
-                    </td>
-                  </tr> :
-
-                filteredReports.map((r) => {
-                  const isSelected = selectedAuditId === r.report_id;
-                  return (
-                    <tr
-                      key={r.report_id}
-                      onClick={() => setSelectedAuditId(r.report_id)}
-                      className="cursor-pointer transition-colors"
-                      style={{
-                        background: isSelected ? "var(--cg-accent-subtle)" : "transparent",
-                        borderBottom: "1px solid var(--cg-line)"
-                      }}>
-                      
-                        <td className="py-3 px-4">
-                          <div className="font-semibold text-xs" style={{ color: "var(--cg-ink)" }}>{r.title}</div>
-                          <div className="text-[11px] font-mono mt-0.5" style={{ color: "var(--cg-ink-secondary)" }}>
-                            {r.scenario} · {r.versionLabel}
-                          </div>
-                        </td>
-                        <td className="py-3 px-4">
-                          <div className="font-medium" style={{ color: "var(--cg-ink)" }}>{r.repo}</div>
-                          <div className="text-[11px] font-mono" style={{ color: "var(--cg-ink-secondary)" }}>
-                            PR #{r.pr_number} (sha {r.commit_sha.slice(0, 7)})
-                          </div>
-                        </td>
-                        <td className="py-3 px-4">{getGateBadge(r.gate_state)}</td>
-                        <td className="py-3 px-4">
-                          <div className="flex items-center gap-1.5 font-mono text-[11px]">
-                            {r.blockedCount > 0 &&
-                          <span
-                            className="px-1.5 py-0.5 rounded font-semibold"
-                            style={{ background: "var(--cg-block-subtle)", color: "var(--cg-block)", border: "1px solid var(--cg-block-line)" }}>
-                            
-                                {r.blockedCount} Blocked
-                              </span>
-                          }
-                            {r.reviewCount > 0 &&
-                          <span
-                            className="px-1.5 py-0.5 rounded font-semibold"
-                            style={{ background: "var(--cg-review-subtle)", color: "var(--cg-review)", border: "1px solid var(--cg-review-line)" }}>
-                            
-                                {r.reviewCount} Review
-                              </span>
-                          }
-                            {r.passedCount > 0 &&
-                          <span
-                            className="px-1.5 py-0.5 rounded font-semibold"
-                            style={{ background: "var(--cg-pass-subtle)", color: "var(--cg-pass)", border: "1px solid var(--cg-pass-line)" }}>
-                            
-                                {r.passedCount} Passed
-                              </span>
-                          }
-                          </div>
-                        </td>
-                        <td className="py-3 px-4 font-mono text-[11px]" style={{ color: "var(--cg-ink-secondary)" }}>
-                          {formatDateTime(r.generated_at)}
-                        </td>
-                        <td className="py-3 px-4 text-right">
-                          <Link
-                          href={`/app/audits/${r.report_id}`}
-                          className="inline-flex items-center gap-1 text-xs font-semibold hover:opacity-70 transition-opacity"
-                          style={{ color: "var(--cg-accent)" }}
-                          onClick={(e) => e.stopPropagation()}>
-                          
-                            <span>Inspect</span>
-                            <span>→</span>
-                          </Link>
-                        </td>
-                      </tr>);
-
-                })
-                }
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        {/* ── Preview Drawer ── */}
-        {selectedAuditId &&
-        <div
-          className="rounded-lg p-5 space-y-4 animate-slide-up"
-          style={{
-            background: "var(--cg-surface)",
-            border: "1px solid var(--cg-line)",
-            boxShadow: "0 2px 8px rgba(0,0,0,0.04)"
-          }}>
-          
-            <div
-            className="flex items-center justify-between pb-3"
-            style={{ borderBottom: "1px solid var(--cg-line)" }}>
-            
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] font-mono font-bold uppercase tracking-wider" style={{ color: "var(--cg-ink-secondary)" }}>
-                  Quick Audit Preview
-                </span>
-                <span className="font-mono text-xs font-semibold" style={{ color: "var(--cg-ink)" }}>{selectedAuditId}</span>
-              </div>
-              <button
-              type="button"
-              onClick={() => setSelectedAuditId(null)}
-              className="text-xs font-mono hover:opacity-70 transition-opacity"
-              style={{ color: "var(--cg-ink-secondary)" }}>
-              
-                Close ✕
-              </button>
-            </div>
-
-            {previewReport ?
-          <div className="space-y-4 text-xs">
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <div>
-                    <span className="block font-mono text-[11px]" style={{ color: "var(--cg-ink-secondary)" }}>Repository:</span>
-                    <span className="font-semibold" style={{ color: "var(--cg-ink)" }}>{previewReport.repo}</span>
-                  </div>
-                  <div>
-                    <span className="block font-mono text-[11px]" style={{ color: "var(--cg-ink-secondary)" }}>Commit SHA:</span>
-                    <span className="font-mono" style={{ color: "var(--cg-ink)" }}>{previewReport.commit_sha}</span>
-                  </div>
-                  <div>
-                    <span className="block font-mono text-[11px]" style={{ color: "var(--cg-ink-secondary)" }}>Gate Verdict:</span>
-                    <span className="font-semibold">{previewReport.gate.description}</span>
-                  </div>
-                </div>
-
-                <div>
-                  <span className="block font-mono text-[11px] mb-1" style={{ color: "var(--cg-ink-secondary)" }}>
-                    Evaluated Findings ({previewReport.findings.length}):
-                  </span>
-                  <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
-                    {previewReport.findings.map((f) =>
-                <div
-                  key={f.id}
-                  className="p-2 rounded flex items-center justify-between"
-                  style={{
-                    background: "var(--cg-surface-subtle)",
-                    border: "1px solid var(--cg-line)"
-                  }}>
-                  
-                        <div className="min-w-0 pr-2">
-                          <span className="font-mono font-bold mr-2" style={{ color: "var(--cg-ink)" }}>{f.id}</span>
-                          <span className="truncate" style={{ color: "var(--cg-ink)" }}>{f.claim_text}</span>
-                        </div>
-                        <span
-                    className="px-1.5 py-px rounded text-[10px] font-mono font-bold shrink-0"
-                    style={{
-                      background:
-                      f.action === "block" ?
-                      "var(--cg-block-subtle)" :
-                      f.action === "review" ?
-                      "var(--cg-review-subtle)" :
-                      "var(--cg-pass-subtle)",
-                      color:
-                      f.action === "block" ?
-                      "var(--cg-block)" :
-                      f.action === "review" ?
-                      "var(--cg-review)" :
-                      "var(--cg-pass)",
-                      border: `1px solid ${
-                      f.action === "block" ?
-                      "var(--cg-block-line)" :
-                      f.action === "review" ?
-                      "var(--cg-review-line)" :
-                      "var(--cg-pass-line)"}`
-
-                    }}>
-                    
-                          {f.action.toUpperCase()}
-                        </span>
-                      </div>
-                )}
-                  </div>
-                </div>
-
-                <div className="pt-2 flex items-center justify-between" style={{ borderTop: "1px solid var(--cg-line)" }}>
-                  <span className="font-mono text-[11px]" style={{ color: "var(--cg-ink-secondary)" }}>
-                    Evaluated at: {formatDateTime(previewReport.generated_at)}
-                  </span>
-                  <Link
-                href={`/app/audits/${selectedAuditId}`}
-                className="px-4 py-1.5 rounded text-xs font-semibold text-white transition-colors"
-                style={{ background: "var(--cg-accent)" }}>
-                
-                    Open full audit workspace →
-                  </Link>
-                </div>
-              </div> :
-
-          <div className="py-4 text-center text-xs" style={{ color: "var(--cg-ink-secondary)" }}>
-                Loading report preview...
-              </div>
-          }
-          </div>
-        }
+        )}
       </div>
-    </AppShell>);
-
+    </AppShell>
+  );
 }

@@ -33,9 +33,9 @@ function RouteSwitch() {
     return <LandingPage />;
   }
 
-  // 2. Mandatory Dedicated Login Page at /login
-  if (pathname === "/login") {
-    return <LoginPage />;
+  // 2. Dedicated Auth Pages at /login and /signup
+  if (pathname === "/login" || pathname === "/signup") {
+    return <LoginPage initialMode={pathname === "/signup" ? "signup" : "login"} />;
   }
 
   // 3. Provider OAuth Callback at /auth/callback

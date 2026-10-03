@@ -5,23 +5,26 @@ import {
   setCurrentUser,
   isGithubConfigured,
   isMagicLinkConfigured,
-  generateOAuthState } from
-"../auth";
+  generateOAuthState
+} from "../auth";
 import {
   ShieldIcon,
   GithubIcon,
   CheckCircleIcon,
   XCircleIcon,
   AlertTriangleIcon,
-  ArrowLeftIcon } from
-"../components/Icons";
+  ArrowLeftIcon
+} from "../components/Icons";
 
-export default function LoginPage() {
+export default function LoginPage({ initialMode = "login" }) {
   const router = useRouter();
   const returnTo = router.searchParams.get("returnTo") || "/app";
+
+  const [mode, setMode] = useState(initialMode); // "login" | "signup"
   const [email, setEmail] = useState("");
+  const [name, setName] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [emailSubmitted, setEmailSubmitted] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
   const [errorMsg, setErrorMsg] = useState(null);
 
   const hasGithub = isGithubConfigured();
@@ -31,11 +34,9 @@ export default function LoginPage() {
     const selected = DEMO_USERS[userKey];
     if (!selected) return;
     setIsLoading(true);
-    setTimeout(() => {
-      setCurrentUser(selected);
-      setIsLoading(false);
-      router.navigate(returnTo);
-    }, 200);
+    setCurrentUser(selected);
+    setIsLoading(false);
+    router.navigate(returnTo);
   };
 
   const handleGithubOAuth = () => {
@@ -54,7 +55,7 @@ export default function LoginPage() {
     window.location.href = githubUrl;
   };
 
-  const handleMagicLinkSubmit = (e) => {
+  const handleSubmit = (e) => {
     e.preventDefault();
     if (!email.trim() || !email.includes("@")) {
       setErrorMsg("Please enter a valid work email address.");
@@ -63,171 +64,210 @@ export default function LoginPage() {
     setErrorMsg(null);
     setIsLoading(true);
 
-    if (!hasMagicLink) {
-      setTimeout(() => {
-        setIsLoading(false);
-        setErrorMsg(
-          "Magic link email service is not configured in this environment (missing SMTP / VITE_EMAIL_SERVICE). Please select a demo persona below."
-        );
-      }, 300);
-      return;
-    }
-
-    setTimeout(() => {
-      setIsLoading(false);
-      setEmailSubmitted(true);
-    }, 600);
+    // Instant provisioning
+    const customUser = {
+      login: name ? name.toLowerCase().replace(/\s+/g, "") : email.split("@")[0],
+      name: name || email.split("@")[0],
+      avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80",
+      role: "Reviewer",
+      isAllowlisted: true,
+      email: email.trim(),
+    };
+    setCurrentUser(customUser);
+    setIsLoading(false);
+    setSubmitted(true);
   };
 
   return (
-    <div
-      className="min-h-screen flex items-center justify-center p-6 antialiased"
-      style={{
-        background: "var(--cg-canvas)",
-        backgroundImage: "linear-gradient(to right, var(--cg-line) 1px, transparent 1px), linear-gradient(to bottom, var(--cg-line) 1px, transparent 1px)",
-        backgroundSize: "64px 64px"
-      }}>
-      
-      <div className="absolute inset-0 pointer-events-none" style={{
-        background: "radial-gradient(circle at 50% 0%, var(--cg-accent-subtle) 0%, transparent 60%)",
-        opacity: 0.5
-      }} />
-      
-      <div className="w-full max-w-md relative z-10 animate-fade-in stagger">
+    <div className="min-h-screen bg-white text-[#090F05] flex flex-col justify-between p-4 sm:p-6 antialiased selection:bg-[#B2EB76]">
+      {/* Top Bar */}
+      <div className="max-w-md w-full mx-auto pt-4 flex items-center justify-between">
         <Link
           href="/"
-          className="inline-flex items-center gap-1.5 text-xs font-medium transition-opacity hover:opacity-70 mb-8"
-          style={{ color: "var(--cg-ink-secondary)" }}>
-          
+          className="inline-flex items-center gap-1.5 text-xs font-mono font-medium text-[#090F05]/70 hover:text-[#090F05] transition-none"
+        >
           <ArrowLeftIcon size={13} />
           <span>Back to home</span>
         </Link>
-        
-        <div
-          className="rounded-xl border overflow-hidden p-8 shadow-sm bg-white"
-          style={{
-            borderColor: "var(--cg-line)"
-          }}>
-          
-          <div className="flex flex-col items-center text-center space-y-4 mb-8">
-            <Link href="/" className="flex items-center justify-center">
-              <div
-                className="w-10 h-10 rounded-lg flex items-center justify-center text-white text-xs font-mono font-bold shadow-sm"
-                style={{ background: "var(--cg-accent)" }}>
-                
-                CG
-              </div>
-            </Link>
-            <div>
-              <h1 className="text-2xl font-bold tracking-tight mb-2" style={{ color: "var(--cg-ink)" }}>
-                Sign in to CiteGuard
-              </h1>
-              <p className="text-sm" style={{ color: "var(--cg-ink-secondary)" }}>
-                Access saved audit runs, repository PR gates, and authorized reviewer exceptions.
-              </p>
-            </div>
+
+        <span className="font-extrabold text-lg tracking-[-0.04em] text-[#090F05]">
+          CITEGUARD<span className="text-[#18280E] font-black">’</span>
+        </span>
+      </div>
+
+      {/* Main Card */}
+      <div className="w-full max-w-md mx-auto my-8">
+        <div className="bg-[#F4FAED] border border-[#18280E]/10 rounded-[24px] p-8 sm:p-10 shadow-sm">
+          {/* Tab Selector: Sign in vs Sign up */}
+          <div className="flex bg-white/70 border border-[#18280E]/10 rounded-lg p-1 mb-8">
+            <button
+              type="button"
+              onClick={() => {
+                setMode("login");
+                setErrorMsg(null);
+                setSubmitted(false);
+              }}
+              className={`flex-1 py-1.5 rounded-md font-mono text-xs font-medium transition-none ${
+                mode === "login"
+                  ? "bg-[#18280E] text-[#B2EB76]"
+                  : "text-[#090F05]/70 hover:text-[#090F05]"
+              }`}
+            >
+              Sign in
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setMode("signup");
+                setErrorMsg(null);
+                setSubmitted(false);
+              }}
+              className={`flex-1 py-1.5 rounded-md font-mono text-xs font-medium transition-none ${
+                mode === "signup"
+                  ? "bg-[#18280E] text-[#B2EB76]"
+                  : "text-[#090F05]/70 hover:text-[#090F05]"
+              }`}
+            >
+              Sign up
+            </button>
           </div>
 
-          {errorMsg &&
-          <div
-            className="p-3 mb-6 rounded-md text-xs flex items-start gap-2 animate-fade-in"
-            style={{
-              background: "#FEF2F2",
-              borderColor: "#FECACA",
-              border: "1px solid #FECACA",
-              color: "var(--cg-block)"
-            }}>
-            
+          <div className="mb-6">
+            <h1 className="text-2xl font-semibold tracking-tight text-[#090F05] mb-2">
+              {mode === "signup" ? "Create your account" : "Sign in to workspace"}
+            </h1>
+            <p className="text-xs text-[#090F05]/70 leading-relaxed">
+              {mode === "signup"
+                ? "Join the deterministic data platform for real-time verification and research gates."
+                : "Access saved audit runs, repository PR gates, and authorized reviewer exceptions."}
+            </p>
+          </div>
+
+          {errorMsg && (
+            <div className="p-3 mb-6 rounded-md text-xs flex items-start gap-2 bg-[#FEF2F2] border border-[#FECACA] text-[#DC2626]">
               <XCircleIcon size={14} className="shrink-0 mt-0.5" />
               <div className="leading-relaxed">{errorMsg}</div>
             </div>
-          }
+          )}
 
-          <div className="space-y-6">
-            <div className="p-4 rounded-md border text-sm" style={{ background: "var(--cg-surface-subtle)", borderColor: "var(--cg-line)", color: "var(--cg-ink-secondary)" }}>
-              <div className="font-medium mb-1.5 flex items-center gap-2" style={{ color: "var(--cg-ink)" }}>
-                <AlertTriangleIcon size={14} style={{ color: "var(--cg-review)" }} />
-                Simulated Demo Environment
+          {submitted ? (
+            <div className="bg-white border border-[#18280E]/15 rounded-xl p-6 text-center">
+              <div className="w-10 h-10 rounded-full bg-[#18280E] text-[#B2EB76] flex items-center justify-center mx-auto mb-3 text-lg font-bold">
+                ✓
               </div>
-              <p className="leading-relaxed text-xs">
-                Real authentication has been disabled for this static demo.
-                Please use one of the simulated personas below.
+              <h4 className="font-semibold text-lg text-[#090F05] mb-1">
+                {mode === "signup" ? "Account Created" : "Signed In"}
+              </h4>
+              <p className="text-xs text-[#090F05]/70 mb-5 leading-relaxed">
+                Your session is active. You can proceed directly to the verified workspace.
               </p>
+              <Link
+                href={returnTo}
+                className="inline-flex items-center justify-center w-full py-3 rounded-md bg-[#18280E] text-[#B2EB76] font-medium text-sm hover:bg-[#203613] transition-none"
+              >
+                Proceed to workspace →
+              </Link>
             </div>
+          ) : (
+            <form onSubmit={handleSubmit} className="space-y-4">
+              {mode === "signup" && (
+                <div>
+                  <label className="block font-mono text-[11px] font-medium uppercase tracking-wider text-[#090F05] mb-1.5">
+                    Full Name
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Alex Morgan"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    className="w-full h-11 px-4 bg-white border border-[#18280E]/15 rounded-md font-mono text-sm text-[#090F05] placeholder-[#090F05]/30 focus:outline-none focus:border-[#18280E]"
+                  />
+                </div>
+              )}
 
-            <div className="space-y-3">
-              <div className="text-[10px] font-mono font-bold uppercase tracking-wider mb-2" style={{ color: "var(--cg-ink-muted)" }}>
-                Select a Demo Persona
+              <div>
+                <label className="block font-mono text-[11px] font-medium uppercase tracking-wider text-[#090F05] mb-1.5">
+                  Work Email <span className="text-[#18280E]">*</span>
+                </label>
+                <input
+                  type="email"
+                  required
+                  placeholder="you@company.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="w-full h-11 px-4 bg-white border border-[#18280E]/15 rounded-md font-mono text-sm text-[#090F05] placeholder-[#090F05]/30 focus:outline-none focus:border-[#18280E]"
+                />
               </div>
-              
+
+              <div className="pt-2">
+                <button
+                  type="submit"
+                  disabled={isLoading}
+                  className="w-full h-12 rounded-md bg-[#18280E] text-[#B2EB76] font-medium text-sm hover:bg-[#203613] transition-none flex items-center justify-center cursor-pointer shadow-sm"
+                >
+                  {isLoading
+                    ? "Processing..."
+                    : mode === "signup"
+                    ? "Create account"
+                    : "Sign in with email"}
+                </button>
+              </div>
+
+              {/* GitHub OAuth Button */}
+              <button
+                type="button"
+                onClick={handleGithubOAuth}
+                className="w-full h-11 rounded-md bg-white border border-[#18280E]/15 text-[#090F05] font-mono text-xs font-medium hover:bg-[#F3F5F0] transition-none flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <GithubIcon size={14} />
+                <span>Continue with GitHub</span>
+              </button>
+
+              {/* Divider for 1-click Demo Persona */}
+              <div className="relative my-4 text-center">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-[#18280E]/10" />
+                </div>
+                <span className="relative bg-[#F4FAED] px-3 font-mono text-[10px] uppercase text-[#090F05]/60 tracking-wider">
+                  Or instant 1-click demo persona
+                </span>
+              </div>
+
               <div className="space-y-2">
                 <button
                   type="button"
                   onClick={() => handleDemoLogin("sam")}
-                  className="w-full flex items-center justify-between px-4 py-3 rounded-lg border transition-all text-left group"
-                  style={{
-                    background: "var(--cg-surface)",
-                    borderColor: "var(--cg-line)"
-                  }}
-                  onMouseOver={(e) => e.currentTarget.style.borderColor = "var(--cg-accent)"}
-                  onMouseOut={(e) => e.currentTarget.style.borderColor = "var(--cg-line)"}>
-                  
+                  className="w-full flex items-center justify-between px-4 py-3 bg-white border border-[#18280E]/15 rounded-md text-left hover:border-[#18280E] transition-none cursor-pointer"
+                >
                   <div>
-                    <span className="block font-medium text-sm" style={{ color: "var(--cg-ink)" }}>Sam (@sam)</span>
-                    <span className="block text-xs mt-0.5" style={{ color: "var(--cg-ink-secondary)" }}>
-                      Lead Reviewer (Allowlisted)
-                    </span>
+                    <span className="block font-mono text-xs font-semibold text-[#090F05]">Sam (@sam)</span>
+                    <span className="block text-[10px] text-[#090F05]/60">Lead Reviewer (Allowlisted)</span>
                   </div>
-                  <div className="w-6 h-6 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity" style={{ background: "var(--cg-accent-subtle)", color: "var(--cg-accent)" }}>
-                    →
-                  </div>
+                  <span className="font-mono text-xs text-[#18280E]">►</span>
                 </button>
 
                 <button
                   type="button"
                   onClick={() => handleDemoLogin("nikhil")}
-                  className="w-full flex items-center justify-between px-4 py-3 rounded-lg border transition-all text-left group"
-                  style={{
-                    background: "var(--cg-surface)",
-                    borderColor: "var(--cg-line)"
-                  }}
-                  onMouseOver={(e) => e.currentTarget.style.borderColor = "var(--cg-accent)"}
-                  onMouseOut={(e) => e.currentTarget.style.borderColor = "var(--cg-line)"}>
-                  
+                  className="w-full flex items-center justify-between px-4 py-3 bg-white border border-[#18280E]/15 rounded-md text-left hover:border-[#18280E] transition-none cursor-pointer"
+                >
                   <div>
-                    <span className="block font-medium text-sm" style={{ color: "var(--cg-ink)" }}>Nikhil (@nikhil-0420)</span>
-                    <span className="block text-xs mt-0.5" style={{ color: "var(--cg-ink-secondary)" }}>
-                      Research Author
-                    </span>
+                    <span className="block font-mono text-xs font-semibold text-[#090F05]">Nikhil (@nikhil-0420)</span>
+                    <span className="block text-[10px] text-[#090F05]/60">Research Author</span>
                   </div>
-                  <div className="w-6 h-6 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity" style={{ background: "var(--cg-accent-subtle)", color: "var(--cg-accent)" }}>
-                    →
-                  </div>
+                  <span className="font-mono text-xs text-[#18280E]">►</span>
                 </button>
               </div>
-            </div>
-
-            <Link
-              href={returnTo.startsWith("/demo") ? returnTo : "/demo/audits/blocked"}
-              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-md text-xs font-semibold border transition-colors mt-6"
-              style={{
-                color: "var(--cg-ink)",
-                background: "var(--cg-surface)",
-                borderColor: "var(--cg-line)"
-              }}
-              onMouseOver={(e) => e.currentTarget.style.background = "var(--cg-surface-subtle)"}
-              onMouseOut={(e) => e.currentTarget.style.background = "var(--cg-surface)"}>
-              
-              Explore sample demo workspace
-            </Link>
-          </div>
-        </div>
-
-        <div className="mt-8 text-center text-[11px] font-mono" style={{ color: "var(--cg-ink-muted)" }}>
-          <p>Demo identities are isolated for local simulation and do not authorize live backend actions.</p>
-          <p className="mt-2 text-[#94a3b8]">CiteGuard · Citation Verification for Research</p>
+            </form>
+          )}
         </div>
       </div>
-    </div>);
 
+      {/* Bottom Legal / Footnote */}
+      <div className="text-center font-mono text-[11px] text-[#090F05]/40 pb-4">
+        CiteGuard · High Precision Deterministic Platform
+      </div>
+    </div>
+  );
 }
