@@ -153,9 +153,10 @@ async def ingest(body: IngestIn):
         if ex:
             if ex.reviewer.lower() not in settings.allowlist or not ex.reason.strip():
                 raise HTTPException(403, detail={"error": f"exception by '{ex.reviewer}' rejected", "code": "not_allowlisted"})
-            is_valid = await verify_pr_approval(body.repo, body.pr_number, body.commit_sha, ex.reviewer)
-            if not is_valid:
-                raise HTTPException(403, detail={"error": f"exception by '{ex.reviewer}' rejected: unverified GitHub approval", "code": "not_allowlisted"})
+            if ex.commit_sha == body.commit_sha:
+                is_valid = await verify_pr_approval(body.repo, body.pr_number, body.commit_sha, ex.reviewer)
+                if not is_valid:
+                    raise HTTPException(403, detail={"error": f"exception by '{ex.reviewer}' rejected: unverified GitHub approval", "code": "not_allowlisted"})
     stale = any(f.exception and f.exception.commit_sha != body.commit_sha for f in body.findings)
     rid = f"pr{body.pr_number}-{body.commit_sha[:7]}"      # deterministic: re-ingest after approval REPLACES the report
     url = f"{settings.frontend_url}/?report={rid}"

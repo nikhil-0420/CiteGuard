@@ -9,6 +9,7 @@ from .routes.tools import router as tools_router, ingest_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    store.load_persisted()
     if settings.mock_mode:
         store.load_mocks()
     yield

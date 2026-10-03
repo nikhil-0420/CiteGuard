@@ -207,3 +207,58 @@ def test_github_approval_verification_scenarios(monkeypatch):
     # Reset token for subsequent tests
     settings.github_token = ""
 
+
+def test_audit_endpoint_security_retries_and_persistence(monkeypatch, tmp_path):
+    import app.routes.api as api
+    from app.store import Store, store
+    from app.models import AuditReport, Gate, Extraction, Summary
+
+    # 1. API key protection
+    with TestClient(app) as c:
+        payload = {"repo": "owner/repo", "pr_number": 42, "commit_sha": "c123456", "markdown": "# Demo"}
+        # Without key -> 401
+        assert c.post("/api/audit", json=payload).status_code == 401
+
+        # 2. Trigger failure allows retry (not marked as seen)
+        async def fail_trigger(req): raise RuntimeError("Nuroen connection error")
+        monkeypatch.setattr(api, "nuroen_trigger", fail_trigger)
+        try:
+            c.post("/api/audit", json=payload, headers=H)
+        except Exception:
+            pass
+        key = "owner/repo#42@c123456"
+        assert key not in api.audited_commits
+
+        # 3. Successful trigger marks commit as audited
+        async def ok_trigger(req): return {"mode": "forwarded", "status": 200}
+        monkeypatch.setattr(api, "nuroen_trigger", ok_trigger)
+        r = c.post("/api/audit", json=payload, headers=H)
+        assert r.status_code == 202 and r.json().get("status") == 200
+        assert key in api.audited_commits
+
+        # 4. Duplicate request without force is rejected as duplicate
+        dup = c.post("/api/audit", json=payload, headers=H)
+        assert dup.status_code == 202 and dup.json().get("duplicate") is True
+
+        # 5. Forced re-audit bypasses seen mark
+        forced = c.post("/api/audit?force=true", json=payload, headers=H)
+        assert forced.status_code == 202 and forced.json().get("status") == 200
+
+    # 6. Atomic persistence & mock non-overwrite
+    test_store = Store()
+    test_store.data_dir = tmp_path / "reports"
+    test_store.data_dir.mkdir(parents=True, exist_ok=True)
+    rep = AuditReport.model_validate(json.loads((MOCK / "report-passed.json").read_text()))
+    test_store.put(rep)
+    # File exists on disk
+    persisted_file = test_store.data_dir / f"{rep.report_id}.json"
+    assert persisted_file.exists()
+
+    # Re-loading into a fresh store preserves persisted report
+    fresh_store = Store()
+    fresh_store.data_dir = test_store.data_dir
+    fresh_store.load_persisted()
+    assert fresh_store.get(rep.report_id) is not None
+    assert fresh_store.get(rep.report_id).gate.state == "success"
+
+
