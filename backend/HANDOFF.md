@@ -1,9 +1,9 @@
 # CiteGuard Backend Handoff Note
 
-**Date:** Fri 2 Oct 2026 (Eve of Nuroen AgentForge)  
+**Date:** Sat 3 Oct 2026 (Nuroen Pivot)  
 **Author:** Sam (Backend Lead)  
-**Branch:** `sam/env-setup`  
-**Status:** Feature-complete, 34/34 tests green, audit pipeline & evaluation verified.
+**Branch:** `sam/nuroen-tools`  
+**Status:** 36/36 tests green, deterministic tools & GitHub integration verified.
 
 ---
 
@@ -12,15 +12,15 @@
 ### Setup Environment
 ```bash
 # In backend/
-uv venv .venv --python 3.12   # or python -m venv .venv
-.venv\Scripts\activate        # Linux/macOS: source .venv/bin/activate
-uv pip install -r requirements.txt
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1    # Linux/macOS: source .venv/bin/activate
+pip install -r requirements.txt
 ```
 
 ### Run Tests
 ```bash
 python -m pytest -q
-# All 34 tests pass (100% green)
+# 36 passed, 1 warning (100% green)
 ```
 
 ### Start Server
@@ -30,90 +30,85 @@ uvicorn app.main:app --reload --port 8000
 
 ---
 
-## 2. Configuration (`backend/.env`)
-
-Copy `backend/.env.example` to `backend/.env` (already in `.gitignore`):
+## 2. Configuration & Secrets (`backend/.env`)
 
 | Variable | Description | Default / Example |
 |---|---|---|
-| `MOCK_MODE` | If `true`, pre-loads canned reports from `contract/mock/` into memory on startup | `true` |
-| `ANTHROPIC_API_KEY` | Anthropic Claude API key for live LLM judge (optional; fallback heuristic active) | `""` |
-| `GEMINI_API_KEY` | Alternative Google Gemini API key for live LLM judge | `""` |
-| `OPENAI_API_KEY` | Alternative OpenAI API key for live LLM judge | `""` |
-| `GITHUB_WEBHOOK_SECRET` | Secret for HMAC-SHA256 signature on `/webhooks/github` | `"change-me"` |
-| `GITHUB_TOKEN` | Fine-grained PAT with commit status write + pull request read permissions | `""` |
-| `REVIEWER_ALLOWLIST` | Comma-separated GitHub usernames allowed to grant policy exceptions | `nikhil-0420,sam-github-login` |
-| `CROSSREF_MAILTO` | Email for Crossref polite API pool | `citeguard@example.com` |
-| `N8N_WEBHOOK_URL` | Webhook URL for outbound signed events to n8n | `""` |
-| `N8N_SHARED_SECRET` | HMAC secret for `X-CiteGuard-Signature` header to n8n | `"change-me"` |
-| `STATUS_WRITER` | Who sets GitHub commit status: `"service"` (backend) or `"n8n"` (orchestrator) | `"service"` |
-| `TOOL_CALL_BUDGET` | Maximum tool calls allowed per audit (budget enforcement) | `24` |
-| `AUDIT_DEADLINE_MS` | Maximum duration before `stop_insufficient_evidence` timeout | `90000` |
-| `CORS_ORIGINS` | Permitted frontend origins | `http://localhost:5173` |
+| `MOCK_MODE` | In mock mode, loads canned mock reports from `contract/mock/`. In live mode (`false`), refuses to start unless secrets are non-default. | `true` |
+| `TOOLS_API_KEY` | Shared secret header (`X-API-Key`) between Nuroen connector and backend tools / audit endpoints. | `"change-me"` |
+| `GITHUB_TOKEN` | Fine-grained PAT with: `Commit statuses: Read and write`, `Contents: Read`, `Pull requests: Read` (Metadata: Read added automatically). | `""` |
+| `GITHUB_WEBHOOK_SECRET` | HMAC-SHA256 secret for verifying GitHub PR webhook signatures. | `"change-me"` |
+| `REVIEWER_ALLOWLIST` | Comma-separated GitHub usernames allowed to grant human exceptions. Warns on startup if empty. | `nikhil-0420` |
+| `PUBLIC_BASE_URL` | Public HTTPS tunnel URL reachable by Nuroen (e.g. ngrok tunnel). | `http://localhost:8000` |
+| `NUROEN_INVOKE_URL` | Optional URL to invoke Nuroen orchestrator. Empty => Manual Mode. | `""` |
+| `NUROEN_API_KEY` | Optional auth token for calling Nuroen API when `NUROEN_INVOKE_URL` is set. | `""` |
+| `FRONTEND_URL` | Frontend origin for report links. | `http://localhost:5173` |
+| `POLICY_VERSION` | Deterministic policy version. | `1.0.0` |
+
+*Note: The backend makes zero LLM calls and requires no Anthropic, Gemini, or OpenAI API key. All model reasoning runs inside Nuroen.*
 
 ---
 
-## 3. Architecture & Implemented Components
+## 3. Important Rules & Architecture
 
-1. **Deterministic Parser (`app/parser.py`)**:
-   - Strictly parses atomic claim markers `[@key]` and the ````bibliography```` YAML block.
-   - Multiple citation markers per sentence or missing keys flag `complete=False` and force Gate `error`.
+1. **The LLM Proposes, Code Disposes:**
+   Nuroen agents propose findings. `app/policy.py` alone determines finding actions and the final PR gate state. When findings are ingested via `POST /api/ingest`, policy is deterministically re-evaluated so manipulated agent output cannot pass the gate.
 
-2. **Corpus Decision & Full-Text Adapter (`app/agent/retrieval.py`, `backend/CORPUS_DECISION.md`)**:
-   - Single chosen corpus: `arxiv_html` (10/10 papers clean in spike).
-   - Fetches HTML from `https://arxiv.org/html/{id}` (or abstract fallback from `export.arxiv.org`).
-   - Sentence-level candidate scoring with stemming and entity weighting.
-   - Real locators (`section`, `paragraph`) with verbatim provenance check via `validate_quote()`.
+2. **Frontend Exception Flow in Live Mode:**
+   - **Mock Mode:** When `MOCK_MODE=true` and `GITHUB_TOKEN` is unset, exceptions can be approved locally via `POST /api/reports/{id}/exceptions` or `/api/ingest` for allowlisted usernames with a reason.
+   - **Live Mode:** When `MOCK_MODE=false` (or a `GITHUB_TOKEN` is configured), an exception is **only valid if confirmed through the GitHub Reviews API** (`GET /repos/{repo}/pulls/{pr_number}/reviews`). An allowlisted account must have submitted an `APPROVED` review on the exact PR commit. Unverified approvals or dismissed/changes-requested reviews are rejected with HTTP 403.
 
-3. **Identity Matching (`app/agent/retrieval.py`)**:
-   - Resolves DOI and queries Crossref polite pool.
-   - Compares title, year, and author family names.
-   - Verified on all 6 demo references:
-     - `vaswani2017`: `matched`
-     - `devlin2018`: `matched`
-     - `he2015`: `matched`
-     - `vaswani2018`: `metadata_mismatch` (`mismatch_fields: ["year", "authors"]`) -> blocks
-     - `lee2026agentic`: `unresolved` (`CG-EXIST-02` indexing lag) -> reviews
-     - `doe2024notes`: planted demo fixture -> reviews with `CG-TRUST-01`
+3. **Year Limitation in Identity Comparison:**
+   - `compare_identity` strictly compares `cited.year` vs `found.year`. Preprints (such as on arXiv) are often uploaded 1 year before the formal peer-reviewed conference/journal publication (e.g. arXiv 2017 vs conference 2018).
+   - This date discrepancy is intentionally flagged as a `metadata_mismatch` on `"year"` (`CG-EXIST-01`) to prevent silent drift, routing the claim to human review/exception.
 
-4. **Structured Judge (`app/agent/judge.py`)**:
-   - Strict JSON validation against `models.Judgment`.
-   - Malformed/unparsable model output safely degrades to `label="unavailable"` (Probe 2).
-   - Direct support for Anthropic Claude, Google Gemini, and OpenAI via `httpx`.
-   - Deterministic offline evaluator active if no API key is provided.
+4. **Atomic Report Persistence:**
+   Reports are persisted as individual JSON files to `backend/data/reports/{report_id}.json` using atomic temporary file creation + rename (`os.replace`). On startup, persisted reports are loaded first, ensuring fresh reports are never overwritten by static mocks. The directory is strictly git-ignored.
 
-5. **Deterministic Policy Engine (`app/policy.py`)**:
-   - Pure functions enforcing `CG-*` rules.
-   - `metadata_mismatch` -> block (`CG-EXIST-01`).
-   - `unresolved` -> review (`CG-EXIST-01` + `CG-EXIST-02`).
-   - Prompt injection flag -> prevents auto-pass (`CG-TRUST-01`).
-   - `contradicted` -> block (`CG-SUPPORT-01`).
-   - Exceptions require authorized reviewer, valid reason, and matching commit SHA (`CG-HUMAN-01`).
-
-6. **Outbound Notification & GitHub Integration (`app/notify.py`, `app/github_status.py`, `app/routes/api.py`)**:
-   - Outbound `N8nEvent` with HMAC-SHA256 signature in `X-CiteGuard-Signature`.
-   - Idempotency key per `repo#pr@sha:event:exceptions`.
-   - GitHub webhook endpoint `/webhooks/github` ready for PR events (`opened`, `synchronize`, `reopened`).
+5. **Manual Mode & Payload Inspection:**
+   When `NUROEN_INVOKE_URL` is empty, PR events log the Nuroen orchestrator payload prominently in the terminal. The latest payload can also be retrieved via `GET /tools/latest-nuroen-payload` (guarded by `X-API-Key`). The payload contains strictly `{repo, pr_number, commit_sha, markdown, callback_url}` and never exposes any API keys or tokens.
 
 ---
 
-## 4. Evaluation Benchmark (`scripts/run_eval.py`)
+## 4. Verification Status
 
-Run against live server:
-```bash
-python scripts/run_eval.py --api-url http://localhost:8000
-```
-Verified metrics on seed claims:
-- **Accuracy:** 100.0%
-- **Unsafe Passes (FP):** 0
-- **Median Latency:** ~300ms
+### Verified (With How)
+- **Deterministic Claim & Bib Parsing:** Verified via `test_parser.py` (5 tests) across atomic claim markers, multiple citations per sentence, and bib extraction.
+- **Identity Comparison:** Verified via `test_tools.py` across:
+  - Accent normalization (e.g. "Müller" == "Muller", "Bengio")
+  - Subtitle handling (e.g. "Title: Subtitle" == "Title")
+  - Hyphens and case insensitivity
+  - Truncated author lists (not flagged as mismatch)
+  - First-author surname mismatch detection
+  - Missing cited author detection
+  - Preprint vs publication year difference detection
+- **Verbatim Quote Provenance:** Verified via `test_validate_quote` with whitespace/case-insensitive exact text matching.
+- **Deterministic Policy Engine:** Verified via `test_policy.py` (10 tests) covering all gate states (`failure`, `pending`, `success`, `error`), prompt injection deterrence (`CG-TRUST-01`), unresolved recent routing (`CG-EXIST-02`), and technical failure fail-closed gate.
+- **GitHub Review Verification & Forged Approval Rejection:** Verified via `test_github_approval_verification_scenarios` in `test_tools.py` with mock GitHub reviews:
+  - Real approvals on matching commit SHA by allowlisted login clear the gate to `success`.
+  - Later `CHANGES_REQUESTED` or `DISMISSED` reviews cancel earlier approval and reject with 403.
+  - Review comments (`COMMENTED`) do not cancel approval.
+  - Non-allowlisted logins and mismatched commit SHAs are rejected with 403.
+  - Network/API errors fail closed (403).
+- **Audit Retries & Forced Re-Audit:** Verified via `test_audit_endpoint_security_retries_and_persistence`:
+  - `POST /api/audit` requires `X-API-Key`.
+  - Commit is recorded as audited only after `nuroen_trigger` succeeds.
+  - Failed triggers allow immediate retry.
+  - Duplicate requests are rejected with 202 `duplicate: true`.
+  - Forced re-audit (`POST /api/audit?force=true`) bypasses duplicate check.
+- **Atomic File Persistence:** Verified via `test_tools.py` with temporary store writing to disk, atomic rename, and reloading into fresh stores without mock overwrites.
+- **Constant-Time Secret Checking:** Verified using `hmac.compare_digest` in `require_key`.
+- **Startup Protection & Allowlist Warning:** Verified via `test_startup_secret_validation_and_allowlist_warning`:
+  - Refuses to boot outside mock mode if secrets are default (`RuntimeError`).
+  - Warns in logs on startup if `REVIEWER_ALLOWLIST` is empty.
+- **PR Markdown Scope:** Verified via `test_fetch_pr_markdown_demo_folder_enforcement`:
+  - Enforces that changed Markdown file must reside under `demo/`.
+  - Rejects PRs with 0 or >1 Markdown files under `demo/`.
+- **Secret Cleanliness:** Scanned entire git log and tracked files; confirmed zero secrets or keys committed.
 
----
-
-## 5. Event-Day Integration Checklist (Sat 3 Oct)
-
-- [ ] **GitHub Demo Repo:** Set up `citeguard-demo`, add branch protection requiring status `CiteGuard`.
-- [ ] **Secrets:** Populate `.env` with actual `GITHUB_TOKEN`, `ANTHROPIC_API_KEY` (or `GEMINI_API_KEY`), and `N8N_SHARED_SECRET`.
-- [ ] **Webhook Tunnel:** Expose `/webhooks/github` via tunnel (ngrok / Cloudflare Tunnel) and point GitHub repo webhook.
-- [ ] **Frontend Handshake:** Verify Nikhil's frontend running on `http://localhost:5173` reads live audit reports seamlessly.
-- [ ] **Smoke Test:** Run `bash scripts/smoke.sh` after each merge.
+### Not Verified (Honest Assessment)
+- **Live GitHub PR Webhook Delivery:** Handlers are tested with HMAC signatures locally, but not tested against a live webhook delivered by GitHub.
+- **Live Branch Protection Rule:** Setting branch protection to require status check `CiteGuard` requires repository admin privileges which the demo fine-grained PAT lacks.
+- **Live GitHub Reviews API Calls:** Tested extensively via simulated `httpx` async responses, but not called against live `api.github.com` endpoints with a live fine-grained token.
+- **Live Nuroen Invoke URL:** `NUROEN_INVOKE_URL` invocation has not been tested against Nuroen's cloud endpoint; system currently defaults to verified Manual Mode.
+- **Historic LLM Judge:** No real model call was ever made in the previous judge scaffold (it used deterministic offline heuristic fallbacks before being removed in the Nuroen pivot).
