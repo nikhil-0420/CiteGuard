@@ -10,3 +10,8 @@ screenshots/
 *.zip
 scratch/
 test_hero.png
+
+venv/
+.idea/
+.vscode/
+data/
