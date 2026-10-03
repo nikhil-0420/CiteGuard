@@ -262,3 +262,50 @@ def test_audit_endpoint_security_retries_and_persistence(monkeypatch, tmp_path):
     assert fresh_store.get(rep.report_id).gate.state == "success"
 
 
+def test_latest_nuroen_payload_endpoint_and_token_cleanliness(capsys):
+    import app.nuroen_client as nc
+    from app.models import AuditRequest
+    from app.config import settings
+
+    # Reset any previous payload
+    nc._latest_payload = None
+
+    with TestClient(app) as c:
+        # 1. 404 when no payload has been generated yet
+        assert c.get("/tools/latest-nuroen-payload", headers=H).status_code == 404
+
+        # 2. 401 without API key
+        assert c.get("/tools/latest-nuroen-payload").status_code == 401
+
+        # 3. Trigger manual audit request
+        import asyncio
+        req = AuditRequest(repo="owner/demo", pr_number=7, commit_sha="abc1234567", markdown="# Test Report")
+        res = asyncio.run(nc.trigger(req))
+        assert res["mode"] == "manual"
+
+        # Check console output
+        captured = capsys.readouterr()
+        assert ">>> NUROEN MANUAL ORCHESTRATOR PAYLOAD <<<" in captured.out
+
+        # 4. Fetch from protected endpoint
+        r = c.get("/tools/latest-nuroen-payload", headers=H)
+        assert r.status_code == 200
+        data = r.json()
+        assert "latest_payload" in data
+        payload = data["latest_payload"]
+
+        # 5. Confirm fields and verify NO keys/tokens/secrets are present
+        assert set(payload.keys()) == {"repo", "pr_number", "commit_sha", "markdown", "callback_url"}
+        assert payload["repo"] == "owner/demo"
+        assert payload["pr_number"] == 7
+        assert payload["commit_sha"] == "abc1234567"
+        assert payload["callback_url"].endswith("/api/ingest")
+
+        # Verify no secrets or config keys leak into payload
+        payload_str = json.dumps(payload)
+        for forbidden in ("tools_api_key", "github_token", "nuroen_api_key", settings.tools_api_key, "Bearer", "secret"):
+            if forbidden:
+                assert forbidden not in payload_str
+
+
+

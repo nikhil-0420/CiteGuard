@@ -14,6 +14,7 @@ from ..store import store
 from ..notify import publish
 from ..agent.judge import validate_quote
 from ..github_pr import verify_pr_approval
+from ..nuroen_client import get_latest_payload
 
 router = APIRouter(prefix="/tools", tags=["tools"])
 ingest_router = APIRouter(tags=["ingest"])
@@ -22,6 +23,15 @@ ingest_router = APIRouter(tags=["ingest"])
 def require_key(x_api_key: str | None = Header(default=None)):
     if not x_api_key or x_api_key != settings.tools_api_key:
         raise HTTPException(401, detail={"error": "bad api key", "code": "bad_request"})
+
+
+# ---------- /tools/latest-nuroen-payload ----------
+@router.get("/latest-nuroen-payload", dependencies=[Depends(require_key)])
+def latest_nuroen_payload():
+    payload = get_latest_payload()
+    if payload is None:
+        raise HTTPException(404, detail={"error": "no payload available", "code": "not_found"})
+    return {"latest_payload": payload}
 
 
 # ---------- /tools/parse ----------
