@@ -68,3 +68,4 @@ def test_technical_error_never_passes():
     r = load("passed")
     _, _, gate = build_report_fields(r.findings, 4, True, r.commit_sha, "u", technical_error=True)
     assert gate.state == "error"
+
