@@ -339,5 +339,50 @@ def test_startup_secret_validation_and_allowlist_warning(caplog):
     settings.tools_api_key = "change-me"
 
 
+def test_fetch_pr_markdown_demo_folder_enforcement(monkeypatch):
+    import httpx, pytest
+    import app.github_pr as gh
+
+    class MockResp:
+        def __init__(self, data, text="", status_code=200):
+            self._data = data
+            self.text = text
+            self.status_code = status_code
+        def json(self): return self._data
+        def raise_for_status(self): pass
+
+    # Case 1: Zero files under demo/ (only docs/readme.md) -> raises ValueError
+    async def mock_files_zero(*a, **kw):
+        return MockResp([{"filename": "docs/readme.md", "status": "modified"}])
+    monkeypatch.setattr(httpx.AsyncClient, "get", mock_files_zero)
+
+    import asyncio
+    with pytest.raises(ValueError, match="no Markdown file under demo/"):
+        asyncio.run(gh.fetch_pr_markdown("o/r", 1, "sha-1"))
+
+    # Case 2: Multiple files under demo/ -> raises ValueError
+    async def mock_files_multi(*a, **kw):
+        return MockResp([
+            {"filename": "demo/report-1.md", "status": "modified"},
+            {"filename": "demo/report-2.md", "status": "added"},
+        ])
+    monkeypatch.setattr(httpx.AsyncClient, "get", mock_files_multi)
+    with pytest.raises(ValueError, match="multiple Markdown files under demo/"):
+        asyncio.run(gh.fetch_pr_markdown("o/r", 1, "sha-1"))
+
+    # Case 3: Exactly one file under demo/ -> returns content
+    async def mock_files_single(client, url, *a, **kw):
+        if "contents" in url:
+            return MockResp(None, text="# Demo Report Content")
+        return MockResp([
+            {"filename": "demo/report-single.md", "status": "modified"},
+            {"filename": "src/code.py", "status": "modified"},
+        ])
+    monkeypatch.setattr(httpx.AsyncClient, "get", mock_files_single)
+    content = asyncio.run(gh.fetch_pr_markdown("o/r", 1, "sha-1"))
+    assert content == "# Demo Report Content"
+
+
+
 
 
