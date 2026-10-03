@@ -1,426 +1,174 @@
 import React, { useState, useMemo } from "react";
 import AppShell from "../components/AppShell";
-import { formatDateTime } from "../utils/date";
 import {
-  DatabaseIcon,
-  ExternalLinkIcon,
-  FilterIcon,
   SearchIcon,
   CheckCircleIcon,
-  XCircleIcon,
   AlertTriangleIcon,
-  FileTextIcon } from
-"../components/Icons";
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+  ExternalLinkIcon,
+} from "../components/Icons";
 
 const CANONICAL_SOURCES = [
-{
-  id: "src-vaswani-2017",
-  canonicalDoi: "10.48550/arXiv.1706.03762",
-  canonicalTitle: "Attention Is All You Need",
-  canonicalAuthors: ["Vaswani", "Shazeer", "Parmar", "Uszkoreit", "Jones", "Gomez", "Kaiser", "Polosukhin"],
-  canonicalYear: 2017,
-  provenance: "crossref_verified",
-  retrievalStatus: "available",
-  lastChecked: "2026-10-03T12:30:00+00:00",
-  occurrences: [
   {
-    occurrenceId: "occ-1",
-    auditId: "blocked",
-    findingId: "F-001",
-    citationKey: "vaswani2017",
-    line: 8,
-    citedYear: 2017,
-    citedAuthors: ["Vaswani", "Shazeer", "Parmar", "Uszkoreit", "Jones", "Gomez", "Kaiser", "Polosukhin"],
-    mismatchFields: [],
-    status: "matched"
+    id: "src-vaswani-2017",
+    canonicalDoi: "10.48550/arXiv.1706.03762",
+    canonicalTitle: "Attention Is All You Need",
+    canonicalAuthors: ["Vaswani", "Shazeer", "Parmar", "Uszkoreit", "Jones", "Gomez", "Kaiser", "Polosukhin"],
+    canonicalYear: 2017,
+    provenance: "crossref_verified",
+    retrievalStatus: "available",
+    occurrenceCount: 2,
   },
   {
-    occurrenceId: "occ-2",
-    auditId: "blocked",
-    findingId: "F-005",
-    citationKey: "vaswani2018",
-    line: 18,
-    citedYear: 2018,
-    citedAuthors: ["Vaswani", "Shazeer", "Parmar"],
-    mismatchFields: ["year", "authors"],
-    status: "metadata_mismatch"
-  }]
-
-},
-{
-  id: "src-he-2015",
-  canonicalDoi: "10.48550/arXiv.1512.03385",
-  canonicalTitle: "Deep Residual Learning for Image Recognition",
-  canonicalAuthors: ["He", "Zhang", "Ren", "Sun"],
-  canonicalYear: 2015,
-  provenance: "crossref_verified",
-  retrievalStatus: "available",
-  lastChecked: "2026-10-03T12:30:00+00:00",
-  occurrences: [
-  {
-    occurrenceId: "occ-3",
-    auditId: "blocked",
-    findingId: "F-003",
-    citationKey: "he2015",
-    line: 13,
-    citedYear: 2015,
-    citedAuthors: ["He", "Zhang", "Ren", "Sun"],
-    mismatchFields: [],
-    status: "matched"
-  }]
-
-},
-{
-  id: "src-devlin-2018",
-  canonicalDoi: "10.48550/arXiv.1810.04805",
-  canonicalTitle: "BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding",
-  canonicalAuthors: ["Devlin", "Chang", "Lee", "Toutanova"],
-  canonicalYear: 2018,
-  provenance: "crossref_verified",
-  retrievalStatus: "available",
-  lastChecked: "2026-10-03T12:30:00+00:00",
-  occurrences: [
-  {
-    occurrenceId: "occ-4",
-    auditId: "blocked",
-    findingId: "F-002",
-    citationKey: "devlin2018",
-    line: 9,
-    citedYear: 2018,
-    citedAuthors: ["Devlin", "Chang", "Lee", "Toutanova"],
-    mismatchFields: [],
-    status: "matched"
+    id: "src-he-2015",
+    canonicalDoi: "10.48550/arXiv.1512.03385",
+    canonicalTitle: "Deep Residual Learning for Image Recognition",
+    canonicalAuthors: ["He", "Zhang", "Ren", "Sun"],
+    canonicalYear: 2015,
+    provenance: "crossref_verified",
+    retrievalStatus: "available",
+    occurrenceCount: 1,
   },
   {
-    occurrenceId: "occ-5",
-    auditId: "blocked",
-    findingId: "F-004",
-    citationKey: "devlin2018",
-    line: 14,
-    citedYear: 2018,
-    citedAuthors: ["Devlin", "Chang", "Lee", "Toutanova"],
-    mismatchFields: [],
-    status: "matched"
-  }]
-
-},
-{
-  id: "src-lee-2026",
-  canonicalDoi: null,
-  canonicalTitle: "Agentic Verification Loops for Scientific Writing",
-  canonicalAuthors: ["Lee"],
-  canonicalYear: 2026,
-  provenance: "unresolved_candidate",
-  retrievalStatus: "unavailable",
-  lastChecked: "2026-10-03T12:30:00+00:00",
-  occurrences: [
+    id: "src-devlin-2018",
+    canonicalDoi: "10.48550/arXiv.1810.04805",
+    canonicalTitle: "BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding",
+    canonicalAuthors: ["Devlin", "Chang", "Lee", "Toutanova"],
+    canonicalYear: 2018,
+    provenance: "crossref_verified",
+    retrievalStatus: "available",
+    occurrenceCount: 2,
+  },
   {
-    occurrenceId: "occ-6",
-    auditId: "blocked",
-    findingId: "F-006",
-    citationKey: "lee2026agentic",
-    line: 19,
-    citedYear: 2026,
-    citedAuthors: ["Lee"],
-    mismatchFields: ["doi"],
-    status: "unresolved"
-  }]
-
-},
-{
-  id: "src-doe-2024",
-  canonicalDoi: "10.0000/planted.2024.notes",
-  canonicalTitle: "Notes on Citation Hygiene",
-  canonicalAuthors: ["Doe"],
-  canonicalYear: 2024,
-  provenance: "sample_fixture",
-  retrievalStatus: "unavailable",
-  lastChecked: "2026-10-03T12:30:00+00:00",
-  occurrences: [
+    id: "src-lee-2026",
+    canonicalDoi: null,
+    canonicalTitle: "Agentic Verification Loops for Scientific Writing",
+    canonicalAuthors: ["Lee"],
+    canonicalYear: 2026,
+    provenance: "unresolved_candidate",
+    retrievalStatus: "unavailable",
+    occurrenceCount: 1,
+  },
   {
-    occurrenceId: "occ-7",
-    auditId: "blocked",
-    findingId: "F-007",
-    citationKey: "doe2024notes",
-    line: 20,
-    citedYear: 2024,
-    citedAuthors: ["Doe"],
-    mismatchFields: [],
-    status: "unresolved"
-  }]
-
-}];
-
+    id: "src-doe-2024",
+    canonicalDoi: "10.0000/planted.2024.notes",
+    canonicalTitle: "Notes on Citation Hygiene",
+    canonicalAuthors: ["Doe"],
+    canonicalYear: 2024,
+    provenance: "sample_fixture",
+    retrievalStatus: "unavailable",
+    occurrenceCount: 1,
+  },
+];
 
 export default function SourcesPage() {
-  const [sources] = useState(CANONICAL_SOURCES);
-  const [selectedSourceId, setSelectedSourceId] = useState(null);
-  const [statusFilter, setStatusFilter] = useState("all");
   const [search, setSearch] = useState("");
 
-  const selectedSource = sources.find((s) => s.id === selectedSourceId) || null;
-
   const filtered = useMemo(() => {
-    return sources.filter((s) => {
-      if (statusFilter !== "all" && s.provenance !== statusFilter) return false;
-      if (search.trim()) {
-        const q = search.toLowerCase();
-        const mTitle = s.canonicalTitle.toLowerCase().includes(q);
-        const mDoi = s.canonicalDoi?.toLowerCase().includes(q) || false;
-        const mAuthors = s.canonicalAuthors.some((a) => a.toLowerCase().includes(q));
-        const mKeys = s.occurrences.some((o) => o.citationKey.toLowerCase().includes(q));
-        return mTitle || mDoi || mAuthors || mKeys;
-      }
-      return true;
+    if (!search.trim()) return CANONICAL_SOURCES;
+    const q = search.toLowerCase();
+    return CANONICAL_SOURCES.filter((s) => {
+      return (
+        s.canonicalTitle.toLowerCase().includes(q) ||
+        s.canonicalAuthors.some((a) => a.toLowerCase().includes(q)) ||
+        s.canonicalDoi?.toLowerCase().includes(q)
+      );
     });
-  }, [sources, statusFilter, search]);
+  }, [search]);
 
-  const getProvenanceBadge = (prov) => {
+  const getProvenanceStyle = (prov) => {
     switch (prov) {
       case "crossref_verified":
-        return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold bg-[var(--cg-pass-subtle)] text-[var(--cg-pass)] border border-[var(--cg-pass-line)]">
-            <CheckCircleIcon size={12} />
-            <span>Crossref Verified</span>
-          </span>);
-
+        return { label: "Verified", color: "text-[#166534]", bg: "bg-[#F4FAED]", border: "border-[#18280E]/20", icon: CheckCircleIcon };
       case "unresolved_candidate":
-        return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold bg-[var(--cg-review-subtle)] text-[var(--cg-review)] border border-[var(--cg-review-line)]">
-            <AlertTriangleIcon size={12} />
-            <span>Unresolved Candidate</span>
-          </span>);
-
-      case "sample_fixture":
-        return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-mono font-semibold bg-[var(--cg-surface-subtle)] text-[var(--cg-ink-secondary)] border border-[var(--cg-line)]">
-            Sample Fixture (Simulated)
-          </span>);
-
+        return { label: "Unresolved", color: "text-[#B45309]", bg: "bg-[#FFFBEB]", border: "border-[#FDE68A]", icon: AlertTriangleIcon };
       default:
-        return null;
+        return { label: "Fixture", color: "text-[#5C6854]", bg: "bg-[#F4FAED]", border: "border-[#18280E]/10", icon: AlertTriangleIcon };
     }
   };
 
   return (
     <AppShell breadcrumbs={[{ label: "Source Library" }]}>
-      <div className="p-6 md:p-8 space-y-6 max-w-7xl mx-auto">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-[var(--cg-line)]">
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight text-[var(--cg-ink)]">Source Library & Canonical Records</h1>
-            <p className="text-xs text-[var(--cg-ink-secondary)] mt-0.5">
-              Canonical publisher registries, DOI fingerprints, and cited draft occurrences.
+      <div className="flex-1 flex flex-col min-h-[calc(100vh-56px)]">
+        {/* Header */}
+        <div className="px-6 md:px-8 pt-8 pb-6">
+          <div className="max-w-3xl mx-auto flex flex-col items-center text-center">
+            <h1 className="text-2xl font-bold tracking-tight text-[#090F05]">
+              Source Library
+            </h1>
+            <p className="text-sm text-[#5C6854] mt-1.5">
+              Canonical references verified against publisher registries.
             </p>
-          </div>
-        </div>
 
-        {/* Filters Toolbar */}
-        <div className="bg-white border border-[var(--cg-line)] rounded-lg p-4 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-3">
-          <div className="relative flex-1 max-w-md">
-            <SearchIcon size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--cg-ink-secondary)]" />
-            <input
-              type="text"
-              placeholder="Search title, DOI, author, citation key..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-8 pr-3 py-1.5 text-xs bg-white border border-[var(--cg-line)] rounded-md text-[var(--cg-ink)] placeholder-[var(--cg-ink-muted)] focus:outline-none focus:border-[var(--cg-accent)]" />
-            
-          </div>
-
-          <div className="flex items-center gap-3 text-xs">
-            <div className="flex items-center gap-1.5">
-              <span className="text-[var(--cg-ink-secondary)] font-medium">Provenance:</span>
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className="bg-white border border-[var(--cg-line)] rounded px-2.5 py-1 text-xs text-[var(--cg-ink)] focus:outline-none focus:border-[var(--cg-accent)]">
-                
-                <option value="all">All Provenance Types</option>
-                <option value="crossref_verified">Crossref Verified</option>
-                <option value="unresolved_candidate">Unresolved Candidates</option>
-                <option value="sample_fixture">Sample Fixtures</option>
-              </select>
+            {/* Search */}
+            <div className="w-full max-w-lg mt-5 relative">
+              <SearchIcon size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-[#8A9684]" />
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search by title, author, or DOI..."
+                className="w-full pl-11 pr-4 py-3 rounded-xl bg-white border-2 border-[#18280E]/12 text-sm text-[#090F05] placeholder-[#8A9684] outline-none focus:border-[#18280E] transition-colors"
+              />
             </div>
           </div>
         </div>
 
-        {/* Canonical Sources Table */}
-        <div className="bg-white border border-[var(--cg-line)] rounded-lg shadow-xs overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs border-collapse">
-              <thead>
-                <tr className="bg-[var(--cg-surface-subtle)] border-b border-[var(--cg-line)] text-[var(--cg-ink-secondary)] font-mono uppercase text-[11px]">
-                  <th className="py-2.5 px-4 font-semibold">Canonical Title & Authors</th>
-                  <th className="py-2.5 px-4 font-semibold">Canonical Identifier / DOI</th>
-                  <th className="py-2.5 px-4 font-semibold">Registry Provenance</th>
-                  <th className="py-2.5 px-4 font-semibold">Cited Occurrences</th>
-                  <th className="py-2.5 px-4 font-semibold">Fulltext</th>
-                  <th className="py-2.5 px-4 text-right font-semibold">Details</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[var(--cg-line)]">
-                {filtered.map((s) => {
-                  const isSelected = selectedSourceId === s.id;
-                  return (
-                    <tr
-                      key={s.id}
-                      onClick={() => setSelectedSourceId(s.id)}
-                      className={`cursor-pointer transition-colors ${
-                      isSelected ? "bg-[var(--cg-accent-subtle)]" : "hover:bg-[var(--cg-surface)]"}`
-                      }>
-                      
-                      <td className="py-3 px-4 max-w-sm">
-                        <div className="font-semibold text-[var(--cg-ink)] text-xs">{s.canonicalTitle}</div>
-                        <div className="text-[11px] text-[var(--cg-ink-secondary)] truncate mt-0.5">
-                          {s.canonicalAuthors.join(", ")} ({s.canonicalYear ?? "Unk."})
+        {/* Source Cards */}
+        <div className="flex-1 px-6 md:px-8 pb-8">
+          <div className="max-w-3xl mx-auto space-y-3">
+            {filtered.length === 0 ? (
+              <div className="py-12 text-center text-sm text-[#8A9684]">
+                No sources matching "{search}"
+              </div>
+            ) : (
+              filtered.map((s) => {
+                const prov = getProvenanceStyle(s.provenance);
+                const ProvIcon = prov.icon;
+                return (
+                  <div
+                    key={s.id}
+                    className="p-5 rounded-xl bg-white border border-[#18280E]/10 hover:border-[#18280E]/25 transition-all"
+                  >
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="min-w-0 flex-1">
+                        <div className="text-sm font-semibold text-[#090F05]">
+                          {s.canonicalTitle}
                         </div>
-                      </td>
-                      <td className="py-3 px-4 font-mono text-[11px] text-[var(--cg-ink)]">
-                        {s.canonicalDoi ?
-                        <span className="text-[var(--cg-accent)]">{s.canonicalDoi}</span> :
-
-                        <span className="text-[var(--cg-ink-muted)]">No DOI registered</span>
-                        }
-                      </td>
-                      <td className="py-3 px-4">{getProvenanceBadge(s.provenance)}</td>
-                      <td className="py-3 px-4 font-mono text-[11px]">
-                        <span className="font-bold text-[var(--cg-ink)]">{s.occurrences.length}</span>{" "}
-                        {s.occurrences.length === 1 ? "occurrence" : "occurrences"}
-                      </td>
-                      <td className="py-3 px-4 font-mono text-[11px]">
-                        {s.retrievalStatus === "available" ?
-                        <span className="text-[var(--cg-pass)] font-semibold">Open Access PDF</span> :
-
-                        <span className="text-[var(--cg-ink-muted)]">Unavailable</span>
-                        }
-                      </td>
-                      <td className="py-3 px-4 text-right">
-                        <button
-                          type="button"
-                          className="text-xs font-semibold text-[var(--cg-accent)] hover:underline">
-                          
-                          View occurrences →
-                        </button>
-                      </td>
-                    </tr>);
-
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        {/* Occurrence Detail Drawer for Selected Source */}
-        {selectedSource &&
-        <div className="bg-white border border-[var(--cg-line)] rounded-lg p-5 shadow-md space-y-4 animate-in fade-in duration-150">
-            <div className="flex items-center justify-between border-b border-[var(--cg-line)] pb-3">
-              <div>
-                <span className="text-xs font-mono font-bold uppercase tracking-wider text-[var(--cg-ink-secondary)]">
-                  Canonical Source Record
-                </span>
-                <h3 className="text-base font-bold text-[var(--cg-ink)] mt-0.5">{selectedSource.canonicalTitle}</h3>
-              </div>
-              <button
-              type="button"
-              onClick={() => setSelectedSourceId(null)}
-              className="text-xs text-[var(--cg-ink-secondary)] hover:text-[var(--cg-ink)] font-mono">
-              
-                Close ✕
-              </button>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
-              <div>
-                <span className="text-[var(--cg-ink-secondary)] block font-mono text-[11px]">Canonical Authors:</span>
-                <span className="font-medium text-[var(--cg-ink)]">{selectedSource.canonicalAuthors.join(", ")}</span>
-              </div>
-              <div>
-                <span className="text-[var(--cg-ink-secondary)] block font-mono text-[11px]">Publication Year:</span>
-                <span className="font-mono text-[var(--cg-ink)] font-semibold">{selectedSource.canonicalYear ?? "Unk."}</span>
-              </div>
-              <div>
-                <span className="text-[var(--cg-ink-secondary)] block font-mono text-[11px]">DOI / Registry Link:</span>
-                {selectedSource.canonicalDoi ?
-              <a
-                href={`https://doi.org/${selectedSource.canonicalDoi}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="font-mono text-[var(--cg-accent)] underline inline-flex items-center gap-1">
-                
-                    <span>{selectedSource.canonicalDoi}</span>
-                    <ExternalLinkIcon size={12} />
-                  </a> :
-
-              <span className="text-[var(--cg-ink-secondary)] font-mono">None registered</span>
-              }
-              </div>
-            </div>
-
-            {/* Cited Occurrences & Diffs */}
-            <div className="pt-2">
-              <h4 className="text-xs font-bold text-[var(--cg-ink)] mb-2 font-mono uppercase tracking-wider">
-                Draft Occurrences Linked to this Canonical Source ({selectedSource.occurrences.length}):
-              </h4>
-              <div className="space-y-2">
-                {selectedSource.occurrences.map((occ) =>
-              <div
-                key={occ.occurrenceId}
-                className="p-3 bg-[var(--cg-surface)] border border-[var(--cg-line)] rounded-md text-xs space-y-1.5">
-                
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono font-bold text-[var(--cg-accent)]">@{occ.citationKey}</span>
-                        <span className="font-mono text-[11px] text-[var(--cg-ink-secondary)]">
-                          Finding {occ.findingId} · Line {occ.line} · Report: {occ.auditId}
-                        </span>
+                        <div className="text-xs text-[#5C6854] mt-1">
+                          {s.canonicalAuthors.join(", ")} · {s.canonicalYear}
+                        </div>
+                        <div className="flex items-center gap-3 mt-2.5 text-xs">
+                          {s.canonicalDoi ? (
+                            <a
+                              href={`https://doi.org/${s.canonicalDoi}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 text-[#18280E] font-mono hover:underline"
+                            >
+                              <span>{s.canonicalDoi}</span>
+                              <ExternalLinkIcon size={11} />
+                            </a>
+                          ) : (
+                            <span className="text-[#8A9684] font-mono">No DOI</span>
+                          )}
+                          <span className="w-1 h-1 rounded-full bg-[#18280E]/15" />
+                          <span className="text-[#8A9684]">
+                            {s.occurrenceCount} citation{s.occurrenceCount !== 1 ? "s" : ""}
+                          </span>
+                        </div>
                       </div>
-                      <span
-                    className={`px-1.5 py-0.2 rounded text-[10px] font-mono font-bold border ${
-                    occ.status === "matched" ?
-                    "bg-[var(--cg-pass-subtle)] text-[var(--cg-pass)] border-[var(--cg-pass-line)]" :
-                    "bg-[var(--cg-review-subtle)] text-[var(--cg-review)] border-[var(--cg-review-line)]"}`
-                    }>
-                    
-                        {occ.status === "matched" ? "METADATA MATCH" : "METADATA MISMATCH"}
+                      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold ${prov.bg} ${prov.color} border ${prov.border} shrink-0`}>
+                        <ProvIcon size={12} />
+                        {prov.label}
                       </span>
                     </div>
-
-                    {occ.mismatchFields.length > 0 &&
-                <div className="p-2 rounded bg-[var(--cg-review-subtle)] border border-[var(--cg-review-line)] text-[11px] text-[var(--cg-review)]">
-                        <strong>Discrepancy:</strong> Draft cited year {occ.citedYear} with authors [{occ.citedAuthors.join(", ")}], but canonical Crossref registry resolves to year {selectedSource.canonicalYear}.
-                      </div>
-                }
                   </div>
-              )}
-              </div>
-            </div>
+                );
+              })
+            )}
           </div>
-        }
+        </div>
       </div>
-    </AppShell>);
-
+    </AppShell>
+  );
 }

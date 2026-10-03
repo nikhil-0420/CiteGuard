@@ -1,5 +1,4 @@
-import { useState } from "react";
-
+import React, { useState } from "react";
 import { pretty } from "./Chip";
 import {
   CheckCircleIcon,
@@ -10,27 +9,18 @@ import {
   CheckIcon,
   ShieldIcon,
   ChevronDownIcon,
-  ChevronRightIcon } from
-"./Icons";
-
-
-
-
-
-
-
-
+  ChevronRightIcon,
+} from "./Icons";
 
 export default function EvidencePanel({
   finding,
   report,
   onOpenExceptionModal,
   onSelectFinding,
-  allFindings
+  allFindings,
 }) {
   const [copiedLink, setCopiedLink] = useState(false);
   const [metadataOpen, setMetadataOpen] = useState(false);
-  const [policyOpen, setPolicyOpen] = useState(false);
   const [traceOpen, setTraceOpen] = useState(false);
 
   const currentIndex = allFindings.findIndex((f) => f.id === finding.id);
@@ -49,22 +39,24 @@ export default function EvidencePanel({
     switch (finding.action) {
       case "pass":
         return (
-          <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-semibold bg-[var(--status-pass-bg)] text-[var(--status-pass-fg)] border border-[#CDE5CD]">
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-mono font-bold bg-[#F4FAED] text-[#166534] border border-[#18280E]/15">
             <CheckCircleIcon size={12} /> PASS
-          </span>);
-
+          </span>
+        );
       case "block":
         return (
-          <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-semibold bg-[var(--status-block-bg)] text-[var(--status-block-fg)] border border-[#F2CACA]">
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-mono font-bold bg-[#FEF2F2] text-[#991B1B] border border-[#FECACA]">
             <XCircleIcon size={12} /> BLOCKED
-          </span>);
-
+          </span>
+        );
       case "review":
         return (
-          <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-semibold bg-[var(--status-review-bg)] text-[var(--status-review-fg)] border border-[#F6DCB6]">
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-mono font-bold bg-[#FFFBEB] text-[#B45309] border border-[#FDE68A]">
             <AlertTriangleIcon size={12} /> NEEDS REVIEW
-          </span>);
-
+          </span>
+        );
+      default:
+        return null;
     }
   };
 
@@ -73,292 +65,314 @@ export default function EvidencePanel({
   const hasInjectedPrompt = finding.rules_applied.includes("CG-TRUST-01");
 
   return (
-    <div className="flex flex-col h-full bg-[var(--cg-surface)] border-l border-[var(--border-strong)] overflow-hidden">
+    <div className="flex flex-col h-full bg-white overflow-hidden font-sans">
       {/* 1. Header Toolbar */}
-      <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border-faint)]">
-        <div className="flex items-center gap-3">
-          <span className="font-mono text-sm font-bold text-[var(--cg-ink)]">
+      <div className="flex items-center justify-between px-6 py-4 border-b border-[#18280E]/10 bg-white">
+        <div className="flex items-center gap-2.5">
+          <span className="font-mono text-xs font-bold text-[#090F05] bg-[#F4FAED] px-2.5 py-1 rounded-lg border border-[#18280E]/10">
             {finding.id}
           </span>
           {getStatusBadge()}
-          {finding.exception &&
-          <span className="text-[11px] font-mono px-2 py-0.5 bg-[var(--accent-subdued)] text-[var(--cg-accent)] border border-[var(--cg-accent)] rounded opacity-90">
+          {finding.exception && (
+            <span className="text-[10px] font-mono px-2 py-0.5 bg-[#F4FAED] text-[#18280E] border border-[#18280E]/20 rounded-full font-semibold">
               Excepted by @{finding.exception.reviewer}
             </span>
-          }
+          )}
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           <button
             type="button"
             onClick={handleCopyLink}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-[var(--ink-subdued)] bg-[var(--cg-surface)] border border-[var(--border-strong)] rounded hover:bg-[var(--cg-block)] cursor-pointer transition-colors"
-            title="Copy deep link to finding">
-            
-            {copiedLink ? <CheckIcon size={14} className="text-[var(--status-pass-fg)]" /> : <CopyIcon size={14} />}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-mono font-medium text-[#5C6854] bg-[#F4FAED] border border-[#18280E]/10 rounded-lg hover:text-[#090F05] hover:bg-[#E8F2DF] cursor-pointer transition-colors"
+            title="Copy deep link to finding"
+          >
+            {copiedLink ? <CheckIcon size={13} className="text-[#166534]" /> : <CopyIcon size={13} />}
             <span>{copiedLink ? "Copied" : "Link"}</span>
           </button>
 
-          <div className="flex items-center border border-[var(--border-strong)] rounded bg-[var(--cg-surface)] overflow-hidden">
+          <div className="flex items-center border border-[#18280E]/10 rounded-lg bg-[#F4FAED] overflow-hidden text-xs font-mono">
             <button
               type="button"
               disabled={!prevFinding}
               onClick={() => prevFinding && onSelectFinding(prevFinding.id)}
-              className="px-3 py-1.5 text-xs font-mono text-[var(--ink-subdued)] hover:bg-[var(--cg-block)] disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition-colors"
-              title="Previous finding">
-              
-              &larr;
+              className="px-2.5 py-1 text-[#5C6854] hover:text-[#090F05] hover:bg-[#E8F2DF] disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition-colors"
+              title="Previous finding"
+            >
+              ←
             </button>
-            <span className="px-2 text-[11px] text-[var(--ink-faint)] font-mono select-none border-l border-r border-[var(--border-faint)] py-1.5">
+            <span className="px-2 text-[10px] text-[#5C6854] select-none border-l border-r border-[#18280E]/10 py-1">
               {currentIndex + 1}/{allFindings.length}
             </span>
             <button
               type="button"
               disabled={!nextFinding}
               onClick={() => nextFinding && onSelectFinding(nextFinding.id)}
-              className="px-3 py-1.5 text-xs font-mono text-[var(--ink-subdued)] hover:bg-[var(--cg-block)] disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition-colors"
-              title="Next finding">
-              
-              &rarr;
+              className="px-2.5 py-1 text-[#5C6854] hover:text-[#090F05] hover:bg-[#E8F2DF] disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition-colors"
+              title="Next finding"
+            >
+              →
             </button>
           </div>
         </div>
       </div>
 
       {/* 2. Scrollable Body */}
-      <div className="flex-1 overflow-y-auto p-6 space-y-6 text-sm">
-        {/* Claim section */}
-        <div>
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-semibold text-[var(--ink-subdued)] tracking-wide">
+      <div className="flex-1 overflow-y-auto p-6 space-y-5 text-xs">
+        {/* Claim Section */}
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between text-[#5C6854] font-mono text-[11px]">
+            <span className="font-semibold uppercase tracking-wider">
               Audited Claim (Line {finding.line})
             </span>
-            <span className="text-[11px] font-mono text-[var(--ink-faint)]">
-              {finding.claim_id} &bull; [@{finding.citation_key}]
+            <span>
+              {finding.claim_id} · [@{finding.citation_key}]
             </span>
           </div>
-          <div className="p-4 bg-[var(--cg-block)] rounded-md text-[var(--cg-ink)] leading-relaxed text-[15px] italic border-l-4 border-[var(--ink-subdued)]">
+          <div className="p-4 bg-[#F8FAF6] rounded-xl text-[#090F05] leading-relaxed text-[13px] border border-[#18280E]/10 italic">
             &ldquo;{finding.claim_text}&rdquo;
           </div>
         </div>
 
         {/* Decisive Source Evidence */}
-        <div>
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-semibold text-[var(--ink-subdued)] tracking-wide">
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between text-[#5C6854] font-mono text-[11px]">
+            <span className="font-semibold uppercase tracking-wider">
               Inspected Source Evidence
             </span>
-            {finding.evidence.passages.length > 0 && finding.evidence.passages[0].quote_validated &&
-            <span className="text-[11px] font-medium text-[var(--status-pass-fg)] bg-[var(--status-pass-bg)] px-2 py-0.5 rounded border border-[#CDE5CD]">
-                ✓ Verbatim quote verified
-              </span>
-            }
+            {finding.evidence.passages.length > 0 &&
+              finding.evidence.passages[0].quote_validated && (
+                <span className="text-[10px] font-mono font-medium text-[#166534] bg-[#F4FAED] px-2 py-0.5 rounded-full border border-[#18280E]/15">
+                  ✓ Verbatim quote verified
+                </span>
+              )}
           </div>
 
-          {isIdentityMismatch ?
-          <div className="p-4 bg-[var(--status-block-bg)] border border-[var(--status-block-fg)] border-opacity-30 rounded-md text-[var(--status-block-fg)] text-sm leading-relaxed space-y-1">
+          {isIdentityMismatch ? (
+            <div className="p-4 bg-[#FEF2F2] border border-[#FECACA] rounded-xl text-[#991B1B] text-xs leading-relaxed space-y-1">
               <div className="font-bold">
                 Support assessment not performed: reference identity mismatch
               </div>
               <p className="opacity-90">
                 {finding.reference.note ||
-              "The cited publication year or authors do not match the canonical registry record."}
+                  "The cited publication year or authors do not match the canonical registry record."}
               </p>
-            </div> :
-          isUnavailable ?
-          <div className="p-4 bg-[var(--status-review-bg)] border border-[var(--status-review-fg)] border-opacity-30 rounded-md text-[var(--status-review-fg)] text-sm leading-relaxed space-y-1">
-              <div className="font-bold">
-                Source passage unavailable
-              </div>
+            </div>
+          ) : isUnavailable ? (
+            <div className="p-4 bg-[#FFFBEB] border border-[#FDE68A] rounded-xl text-[#B45309] text-xs leading-relaxed space-y-1">
+              <div className="font-bold">Source passage unavailable</div>
               <p className="opacity-90">
                 {finding.reference.note ||
-              "No matching record found in indexed registries within retrieval budget. Flagged for reviewer inspection without fabricating content."}
+                  "No matching record found in indexed registries within retrieval budget. Flagged for reviewer inspection without fabricating content."}
               </p>
-            </div> :
-          finding.evidence.passages.length > 0 ?
-          <div className="pl-4 py-3 bg-[var(--cg-block)] rounded border-l-4 border-[var(--cg-accent)] space-y-3">
-              <p className="text-sm text-[var(--cg-ink)] leading-relaxed">
+            </div>
+          ) : finding.evidence.passages.length > 0 ? (
+            <div className="p-4 bg-[#F4FAED] rounded-xl border border-[#18280E]/12 space-y-2.5">
+              <p className="text-xs text-[#090F05] leading-relaxed font-serif">
                 &ldquo;{finding.evidence.passages[0].text}&rdquo;
               </p>
-              <div className="flex items-center justify-between pt-2 border-t border-[var(--border-strong)] border-opacity-50 text-[11px] text-[var(--ink-subdued)] font-mono">
+              <div className="flex items-center justify-between pt-2 border-t border-[#18280E]/10 text-[10px] text-[#5C6854] font-mono">
                 <span>
-                  Locator: Section {finding.evidence.passages[0].locator.section}, Paragraph {finding.evidence.passages[0].locator.paragraph}
+                  Section {finding.evidence.passages[0].locator.section}, Paragraph{" "}
+                  {finding.evidence.passages[0].locator.paragraph}
                 </span>
                 <span>Provenance: {finding.evidence.corpus}</span>
               </div>
-            </div> :
-
-          <div className="p-4 bg-[var(--cg-block)] border border-[var(--border-faint)] rounded-md text-sm text-[var(--ink-subdued)] italic">
+            </div>
+          ) : (
+            <div className="p-4 bg-[#F8FAF6] border border-[#18280E]/10 rounded-xl text-xs text-[#5C6854] italic">
               No direct passages retrieved.
             </div>
-          }
+          )}
         </div>
 
-        {/* Judgment & Discrepancy Highlight */}
-        <div className="p-4 bg-[var(--cg-surface)] border border-[var(--border-strong)] rounded-md shadow-sm space-y-3">
-          <div className="flex items-center justify-between pb-2 border-b border-[var(--border-faint)]">
-            <span className="text-sm font-semibold text-[var(--cg-ink)]">
-              Evaluation Verdict:{" "}
-              <span className="uppercase text-[var(--cg-accent)] font-mono font-bold tracking-tight">
+        {/* Judgment & Discrepancy Card */}
+        <div className="p-4 bg-white border border-[#18280E]/10 rounded-xl shadow-xs space-y-2.5">
+          <div className="flex items-center justify-between pb-2 border-b border-[#18280E]/10">
+            <span className="text-xs font-semibold text-[#090F05]">
+              Verdict:{" "}
+              <span className="uppercase text-[#18280E] font-mono font-bold tracking-tight">
                 {pretty(finding.judgment.label)}
               </span>
             </span>
-            <span className="text-[11px] font-mono text-[var(--ink-subdued)]">
+            <span className="text-[10px] font-mono text-[#5C6854]">
               Rule: {finding.rules_applied.join(", ")}
             </span>
           </div>
 
-          <p className="text-sm text-[var(--cg-ink)] leading-relaxed">
+          <p className="text-xs text-[#090F05] leading-relaxed">
             {finding.judgment.rationale}
           </p>
 
           {/* Specific Comparison Callout */}
-          {finding.id === "F-003" &&
-          <div className="mt-3 p-3 bg-[var(--status-block-bg)] border border-[#F2CACA] rounded text-sm space-y-1.5">
-              <span className="font-semibold text-[var(--status-block-fg)]">Numerical Discrepancy:</span>
+          {finding.id === "F-003" && (
+            <div className="mt-2 p-3 bg-[#FEF2F2] border border-[#FECACA] rounded-xl text-xs space-y-1 font-mono">
+              <span className="font-semibold text-[#991B1B]">Numerical Discrepancy:</span>
               <div className="flex items-center gap-3">
-                <span className="text-[var(--status-block-fg)]">Claimed: <code className="bg-[var(--cg-surface)] px-1.5 py-0.5 rounded border border-[#F2CACA] font-bold">&lt; 2%</code></span>
-                <span className="text-[var(--status-block-fg)] opacity-60 font-bold">&ne;</span>
-                <span className="text-[var(--status-block-fg)]">Source: <code className="bg-[var(--cg-surface)] px-1.5 py-0.5 rounded border border-[#F2CACA] font-bold">3.57%</code></span>
+                <span className="text-[#991B1B]">
+                  Claimed: <code className="bg-white px-1.5 py-0.5 rounded border border-[#FECACA] font-bold">&lt; 2%</code>
+                </span>
+                <span className="text-[#991B1B] font-bold">≠</span>
+                <span className="text-[#991B1B]">
+                  Source: <code className="bg-white px-1.5 py-0.5 rounded border border-[#FECACA] font-bold">3.57%</code>
+                </span>
               </div>
             </div>
-          }
+          )}
 
-          {finding.id === "F-004" &&
-          <div className="mt-3 p-3 bg-[var(--status-review-bg)] border border-[#F6DCB6] rounded text-sm space-y-1.5">
-              <span className="font-semibold text-[var(--status-review-fg)]">Scope Discrepancy:</span>
+          {finding.id === "F-004" && (
+            <div className="mt-2 p-3 bg-[#FFFBEB] border border-[#FDE68A] rounded-xl text-xs space-y-1 font-mono">
+              <span className="font-semibold text-[#B45309]">Scope Discrepancy:</span>
               <div className="flex items-center gap-3">
-                <span className="text-[var(--status-review-fg)]">Claimed: <code className="bg-[var(--cg-surface)] px-1.5 py-0.5 rounded border border-[#F6DCB6] font-bold">all tasks</code></span>
-                <span className="text-[var(--status-review-fg)] opacity-60 font-bold">&gt;</span>
-                <span className="text-[var(--status-review-fg)]">Source: <code className="bg-[var(--cg-surface)] px-1.5 py-0.5 rounded border border-[#F6DCB6] font-bold">eleven tasks</code></span>
+                <span className="text-[#B45309]">
+                  Claimed: <code className="bg-white px-1.5 py-0.5 rounded border border-[#FDE68A] font-bold">all tasks</code>
+                </span>
+                <span className="text-[#B45309] font-bold">&gt;</span>
+                <span className="text-[#B45309]">
+                  Source: <code className="bg-white px-1.5 py-0.5 rounded border border-[#FDE68A] font-bold">eleven tasks</code>
+                </span>
               </div>
             </div>
-          }
+          )}
 
-          {hasInjectedPrompt &&
-          <div className="mt-3 p-3 bg-[var(--status-pass-bg)] border border-[#CDE5CD] rounded text-sm space-y-1 text-[var(--status-pass-fg)]">
+          {hasInjectedPrompt && (
+            <div className="mt-2 p-3 bg-[#F4FAED] border border-[#18280E]/15 rounded-xl text-xs space-y-1 text-[#166534]">
               <div className="flex items-center gap-1.5 font-bold">
-                <ShieldIcon size={14} />
+                <ShieldIcon size={13} />
                 <span>CG-TRUST-01: Untrusted Instruction Neutralized</span>
               </div>
-              <p className="text-xs opacity-90 leading-relaxed">
+              <p className="text-[11px] opacity-90 leading-relaxed font-sans">
                 Source document contained an embedded instruction to alter the policy gate. The verification engine treated source text strictly as data and ignored directives.
               </p>
             </div>
-          }
+          )}
         </div>
 
         {/* Primary Action Button */}
         <div>
-          {finding.action !== "pass" && !finding.exception ?
-          <button
-            type="button"
-            onClick={() => onOpenExceptionModal(finding)}
-            className="w-full py-3 px-4 text-sm font-semibold text-[var(--cg-surface)] bg-[var(--cg-ink)] hover:bg-[var(--ink-subdued)] rounded-md shadow-sm transition-colors cursor-pointer flex items-center justify-center gap-2">
-            
-              <span>Record Reviewer Exception &rarr;</span>
-            </button> :
-          finding.exception ?
-          <div className="p-3 bg-[var(--accent-subdued)] border border-[#F1D5CD] rounded-md text-sm text-[var(--accent-hover)] flex items-center justify-between">
+          {finding.action !== "pass" && !finding.exception ? (
+            <button
+              type="button"
+              onClick={() => onOpenExceptionModal(finding)}
+              className="w-full py-2.5 px-4 text-xs font-semibold text-[#B2EB76] bg-[#18280E] hover:bg-[#223814] rounded-full shadow-xs transition-colors cursor-pointer flex items-center justify-center gap-2"
+            >
+              <span>Record Reviewer Exception →</span>
+            </button>
+          ) : finding.exception ? (
+            <div className="p-3 bg-[#F4FAED] border border-[#18280E]/15 rounded-xl text-xs text-[#090F05] flex items-center justify-between font-mono">
               <span className="font-semibold">Exception recorded by @{finding.exception.reviewer}</span>
-              <span className="font-mono text-[11px] font-bold opacity-80">Permanent Log</span>
-            </div> :
-
-          <div className="p-3 bg-[var(--status-pass-bg)] border border-[#CDE5CD] rounded text-center text-sm text-[var(--status-pass-fg)] font-semibold">
+              <span className="text-[10px] text-[#166534] font-bold bg-white px-2 py-0.5 rounded border border-[#18280E]/10">
+                Permanent Trail
+              </span>
+            </div>
+          ) : (
+            <div className="p-3 bg-[#F4FAED] border border-[#18280E]/15 rounded-xl text-center text-xs text-[#166534] font-semibold font-mono">
               Finding satisfies all deterministic criteria.
             </div>
-          }
+          )}
         </div>
 
-        {/* 3. Expandable Subsections */}
-        <div className="pt-4 border-t border-[var(--border-strong)] space-y-3">
+        {/* Expandable Subsections */}
+        <div className="pt-3 border-t border-[#18280E]/10 space-y-2">
           {/* Metadata Accordion */}
-          <div className="border border-[var(--border-strong)] rounded-md overflow-hidden bg-[var(--cg-block)]">
+          <div className="border border-[#18280E]/10 rounded-xl overflow-hidden bg-[#F8FAF6]">
             <button
               type="button"
               onClick={() => setMetadataOpen(!metadataOpen)}
-              className="w-full flex items-center justify-between p-3 text-xs font-semibold text-[var(--cg-ink)] hover:bg-[var(--border-faint)] cursor-pointer transition-colors">
-              
-              <span>Reference Metadata & Identity Resolution</span>
-              {metadataOpen ? <ChevronDownIcon size={16} className="text-[var(--ink-subdued)]" /> : <ChevronRightIcon size={16} className="text-[var(--ink-subdued)]" />}
+              className="w-full flex items-center justify-between p-3 text-xs font-semibold text-[#090F05] hover:bg-[#F4FAED] cursor-pointer transition-colors"
+            >
+              <span>Reference Metadata & Identity</span>
+              {metadataOpen ? (
+                <ChevronDownIcon size={14} className="text-[#5C6854]" />
+              ) : (
+                <ChevronRightIcon size={14} className="text-[#5C6854]" />
+              )}
             </button>
-            {metadataOpen &&
-            <div className="p-4 bg-[var(--cg-surface)] text-xs space-y-2 border-t border-[var(--border-strong)]">
-                <table className="w-full border-collapse text-left">
-                  <tbody>
-                    <tr className="border-b border-[var(--border-faint)]">
-                      <td className="py-2 text-[var(--ink-subdued)] w-28">Title</td>
-                      <td className="py-2 font-medium text-[var(--cg-ink)]">{finding.reference.title}</td>
-                    </tr>
-                    <tr className="border-b border-[var(--border-faint)]">
-                      <td className="py-2 text-[var(--ink-subdued)]">Authors</td>
-                      <td className="py-2 text-[var(--cg-ink)]">{finding.reference.authors.join(", ")}</td>
-                    </tr>
-                    <tr className="border-b border-[var(--border-faint)]">
-                      <td className="py-2 text-[var(--ink-subdued)]">Year</td>
-                      <td className="py-2 font-mono text-[var(--cg-ink)]">{finding.reference.year}</td>
-                    </tr>
-                    <tr className="border-b border-[var(--border-faint)]">
-                      <td className="py-2 text-[var(--ink-subdued)]">Identifier / DOI</td>
-                      <td className="py-2 font-mono">
-                        {finding.reference.doi ?
+            {metadataOpen && (
+              <div className="p-3 bg-white text-xs space-y-2 border-t border-[#18280E]/10 font-mono">
+                <div className="flex justify-between py-1 border-b border-[#18280E]/5">
+                  <span className="text-[#5C6854]">Title</span>
+                  <span className="font-medium text-[#090F05] text-right max-w-[200px] truncate">
+                    {finding.reference.title}
+                  </span>
+                </div>
+                <div className="flex justify-between py-1 border-b border-[#18280E]/5">
+                  <span className="text-[#5C6854]">Authors</span>
+                  <span className="text-[#090F05] text-right max-w-[200px] truncate">
+                    {finding.reference.authors.join(", ")}
+                  </span>
+                </div>
+                <div className="flex justify-between py-1 border-b border-[#18280E]/5">
+                  <span className="text-[#5C6854]">Year</span>
+                  <span className="text-[#090F05]">{finding.reference.year}</span>
+                </div>
+                <div className="flex justify-between py-1 border-b border-[#18280E]/5">
+                  <span className="text-[#5C6854]">DOI</span>
+                  <span>
+                    {finding.reference.doi ? (
                       <a
                         href={`https://doi.org/${finding.reference.doi}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-[var(--cg-accent)] hover:text-[var(--accent-hover)] hover:underline inline-flex items-center gap-1.5 transition-colors">
-                        
-                            {finding.reference.doi}
-                            <ExternalLinkIcon size={12} />
-                          </a> :
-
-                      <span className="text-[var(--ink-faint)]">None</span>
-                      }
-                      </td>
-                    </tr>
-                    <tr>
-                      <td className="py-2 text-[var(--ink-subdued)]">Status</td>
-                      <td className="py-2">
-                        <span className="font-mono text-[11px] font-bold uppercase text-[var(--cg-ink)] bg-[var(--cg-block)] px-2 py-0.5 rounded border border-[var(--border-strong)]">
-                          {finding.reference.status}
-                        </span>
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
+                        className="text-[#18280E] font-bold hover:underline inline-flex items-center gap-1"
+                      >
+                        {finding.reference.doi}
+                        <ExternalLinkIcon size={11} />
+                      </a>
+                    ) : (
+                      <span className="text-[#8A9684]">None</span>
+                    )}
+                  </span>
+                </div>
+                <div className="flex justify-between py-1">
+                  <span className="text-[#5C6854]">Registry Status</span>
+                  <span className="text-[10px] font-bold uppercase text-[#090F05] bg-[#F4FAED] px-2 py-0.5 rounded border border-[#18280E]/10">
+                    {finding.reference.status}
+                  </span>
+                </div>
               </div>
-            }
+            )}
           </div>
 
           {/* Trace Accordion */}
-          <div className="border border-[var(--border-strong)] rounded-md overflow-hidden bg-[var(--cg-block)]">
+          <div className="border border-[#18280E]/10 rounded-xl overflow-hidden bg-[#F8FAF6]">
             <button
               type="button"
               onClick={() => setTraceOpen(!traceOpen)}
-              className="w-full flex items-center justify-between p-3 text-xs font-semibold text-[var(--cg-ink)] hover:bg-[var(--border-faint)] cursor-pointer transition-colors">
-              
+              className="w-full flex items-center justify-between p-3 text-xs font-semibold text-[#090F05] hover:bg-[#F4FAED] cursor-pointer transition-colors"
+            >
               <span>Agent Execution Steps ({finding.agent_trace.length} actions)</span>
-              {traceOpen ? <ChevronDownIcon size={16} className="text-[var(--ink-subdued)]" /> : <ChevronRightIcon size={16} className="text-[var(--ink-subdued)]" />}
-            </button>
-            {traceOpen &&
-            <div className="p-4 bg-[var(--cg-surface)] space-y-3 border-t border-[var(--border-strong)]">
-                {finding.agent_trace.map((step) =>
-              <div
-                key={step.step}
-                className="p-3 bg-[var(--cg-block)] border border-[var(--border-faint)] rounded-md text-xs space-y-2 font-mono">
-                
-                    <div className="flex items-center justify-between text-[var(--cg-ink)] font-bold border-b border-[var(--border-strong)] pb-1.5">
-                      <span>Step {step.step}: {step.action}</span>
-                    </div>
-                    <div className="text-[var(--ink-subdued)] text-[12px] leading-relaxed pt-1">{step.observation}</div>
-                    <div className="text-[var(--ink-faint)] text-[11px] italic bg-[var(--cg-surface)] p-2 rounded border border-[var(--border-faint)]">Rationale: {step.reason}</div>
-                  </div>
+              {traceOpen ? (
+                <ChevronDownIcon size={14} className="text-[#5C6854]" />
+              ) : (
+                <ChevronRightIcon size={14} className="text-[#5C6854]" />
               )}
+            </button>
+            {traceOpen && (
+              <div className="p-3 bg-white space-y-2 border-t border-[#18280E]/10">
+                {finding.agent_trace.map((step) => (
+                  <div
+                    key={step.step}
+                    className="p-2.5 bg-[#F8FAF6] border border-[#18280E]/10 rounded-lg text-xs space-y-1 font-mono"
+                  >
+                    <div className="flex items-center justify-between text-[#090F05] font-bold border-b border-[#18280E]/10 pb-1">
+                      <span>
+                        Step {step.step}: {step.action}
+                      </span>
+                    </div>
+                    <div className="text-[#5C6854] text-[11px] leading-relaxed pt-0.5">
+                      {step.observation}
+                    </div>
+                    <div className="text-[#8A9684] text-[10px] italic bg-white p-1.5 rounded border border-[#18280E]/5">
+                      Rationale: {step.reason}
+                    </div>
+                  </div>
+                ))}
               </div>
-            }
+            )}
           </div>
         </div>
       </div>
-    </div>);
-
+    </div>
+  );
 }

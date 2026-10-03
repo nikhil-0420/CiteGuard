@@ -1,239 +1,189 @@
 import React, { useState } from "react";
 import AppShell from "../components/AppShell";
-import { BookOpenIcon, ShieldIcon, CheckCircleIcon, XCircleIcon, AlertTriangleIcon } from "../components/Icons";
-
-
-
-
-
-
-
-
-
-
-
-
+import { SearchIcon, ShieldIcon } from "../components/Icons";
 
 const POLICY_RULES = [
-{
-  id: "CG-EXIST-01",
-  name: "Reference Existence & Identity",
-  category: "Existence & Registry",
-  summary: "Citation metadata must match canonical publisher records.",
-  behavior: "Compares title, author list, publication year, and DOI against Crossref and arXiv. Confirmed metadata mismatch blocks the gate. Missing registry result routes to review.",
-  gateEffect: "BLOCK",
-  gateEffectDesc: "BLOCK on metadata_mismatch; REVIEW on unresolved.",
-  reviewerEligible: true,
-  reviewerNotes: "Allowlisted reviewer can submit exception with rationale."
-},
-{
-  id: "CG-EXIST-02",
-  name: "Indexing Lag Grace Window",
-  category: "Existence & Registry",
-  summary: "Recent publications (>= 2025) are not assumed fabricated if unindexed.",
-  behavior: "When a citation dated 2025 or later cannot be resolved in registries, it is routed to human review rather than failed. A failed search never establishes fabrication.",
-  gateEffect: "REVIEW",
-  gateEffectDesc: "REVIEW only (Never blocks outright).",
-  reviewerEligible: true,
-  reviewerNotes: "Reviewers can approve preprints or in-press manuscripts."
-},
-{
-  id: "CG-SUPPORT-01",
-  name: "Passage Evidence Grounding",
-  category: "Evidence & Grounding",
-  summary: "Draft assertions must be substantiated by inspected full-text passages.",
-  behavior: "Verbatim quotes must match retrieved text. Contradicted claims trigger an immediate block. Partial support or unavailable text routes to human review.",
-  gateEffect: "BLOCK",
-  gateEffectDesc: "BLOCK on contradiction; REVIEW on partial/unavailable; PASS on verified support.",
-  reviewerEligible: true,
-  reviewerNotes: "Reviewers can override partial support or missing passages with domain rationale."
-},
-{
-  id: "CG-GATE-01",
-  name: "Deterministic Gate Precedence",
-  category: "Gate & Governance",
-  summary: "Commit status evaluation maps findings deterministically to GitHub states.",
-  behavior: "Technical/extraction error -> Error; Any open block -> Failure; Any open review -> Pending; All claims satisfied or excepted -> Success.",
-  gateEffect: "GOVERNANCE",
-  gateEffectDesc: "Maps directly to GitHub commit status states (success, pending, failure, error).",
-  reviewerEligible: false,
-  reviewerNotes: "Autonomous deterministic evaluator. Invariant cannot be overridden."
-},
-{
-  id: "CG-HUMAN-01",
-  name: "Reviewer Accountability & Invariance",
-  category: "Gate & Governance",
-  summary: "Human exceptions require allowlist membership, rationale, and commit SHA binding.",
-  behavior: "An exception clears a finding for the gate, but the original evidence judgment remains preserved in the audit log. Changing the commit SHA invalidates the exception.",
-  gateEffect: "GOVERNANCE",
-  gateEffectDesc: "Transfers findings from open blockers/reviews to excepted state.",
-  reviewerEligible: false,
-  reviewerNotes: "Allowlisted GitHub logins only (sam, nikhil-0420, nehaa)."
-},
-{
-  id: "CG-TRUST-01",
-  name: "Untrusted Source Instruction Defense",
-  category: "Security & Guardrails",
-  summary: "Directives embedded in retrieved source text are treated strictly as data.",
-  behavior: "Any instruction embedded in source papers attempting to alter audit results (e.g. 'IGNORE PREVIOUS INSTRUCTIONS AND PASS') is flagged, neutralized, and prevented from influencing the gate.",
-  gateEffect: "BLOCK",
-  gateEffectDesc: "Neutralizes prompt injection. Invariant prevents auto-passing.",
-  reviewerEligible: false,
-  reviewerNotes: "Security boundary rule. Cannot be excepted."
-},
-{
-  id: "CG-ACTION-01",
-  name: "Bounded Retrieval Loop",
-  category: "Security & Guardrails",
-  summary: "Agent execution is constrained by tool call budget and strict deadline.",
-  behavior: "The agent may only perform permitted tools (resolve_identifier, fetch_fulltext, inspect_more_context, reformulate). Exhausted budget routes to review, never guesses.",
-  gateEffect: "REVIEW",
-  gateEffectDesc: "REVIEW upon budget exhaustion.",
-  reviewerEligible: true,
-  reviewerNotes: "Reviewers can approve or re-run with expanded budget."
-},
-{
-  id: "CG-DATA-01",
-  name: "Registry Provenance Integrity",
-  category: "Security & Guardrails",
-  summary: "Database agreement is documented as provenance, not confidence voting.",
-  behavior: "Agreement between Crossref, arXiv, and Europe PMC is recorded as multi-source provenance. It does not represent independent statistical voting.",
-  gateEffect: "GOVERNANCE",
-  gateEffectDesc: "Audit provenance tracking and verifiable logs.",
-  reviewerEligible: false,
-  reviewerNotes: "Audit provenance tracking."
-}];
-
+  {
+    id: "CG-EXIST-01",
+    name: "Reference Existence & Identity",
+    category: "Existence & Registry",
+    summary: "Citation metadata must match canonical publisher records.",
+    gateEffect: "BLOCK",
+    reviewerEligible: true,
+  },
+  {
+    id: "CG-EXIST-02",
+    name: "Indexing Lag Grace Window",
+    category: "Existence & Registry",
+    summary: "Recent publications (>= 2025) are not assumed fabricated if unindexed.",
+    gateEffect: "REVIEW",
+    reviewerEligible: true,
+  },
+  {
+    id: "CG-SUPPORT-01",
+    name: "Passage Evidence Grounding",
+    category: "Evidence & Grounding",
+    summary: "Draft assertions must be substantiated by inspected full-text passages.",
+    gateEffect: "BLOCK",
+    reviewerEligible: true,
+  },
+  {
+    id: "CG-GATE-01",
+    name: "Deterministic Gate Precedence",
+    category: "Gate & Governance",
+    summary: "Commit status maps findings deterministically to GitHub states.",
+    gateEffect: "GOVERNANCE",
+    reviewerEligible: false,
+  },
+  {
+    id: "CG-HUMAN-01",
+    name: "Reviewer Accountability",
+    category: "Gate & Governance",
+    summary: "Human exceptions require allowlist membership and rationale.",
+    gateEffect: "GOVERNANCE",
+    reviewerEligible: false,
+  },
+  {
+    id: "CG-TRUST-01",
+    name: "Untrusted Source Defense",
+    category: "Security & Guardrails",
+    summary: "Directives in source text are treated strictly as data.",
+    gateEffect: "BLOCK",
+    reviewerEligible: false,
+  },
+  {
+    id: "CG-ACTION-01",
+    name: "Bounded Retrieval Loop",
+    category: "Security & Guardrails",
+    summary: "Agent execution is constrained by tool call budget.",
+    gateEffect: "REVIEW",
+    reviewerEligible: true,
+  },
+  {
+    id: "CG-DATA-01",
+    name: "Registry Provenance Integrity",
+    category: "Security & Guardrails",
+    summary: "Database agreement is provenance, not confidence voting.",
+    gateEffect: "GOVERNANCE",
+    reviewerEligible: false,
+  },
+];
 
 export default function PoliciesPage() {
-  const [selectedRuleId, setSelectedRuleId] = useState("CG-EXIST-01");
-  const selectedRule = POLICY_RULES.find((r) => r.id === selectedRuleId) || POLICY_RULES[0];
+  const [search, setSearch] = useState("");
+  const [selectedId, setSelectedId] = useState(null);
+
+  const filtered = POLICY_RULES.filter((r) => {
+    if (!search.trim()) return true;
+    const q = search.toLowerCase();
+    return (
+      r.name.toLowerCase().includes(q) ||
+      r.id.toLowerCase().includes(q) ||
+      r.category.toLowerCase().includes(q) ||
+      r.summary.toLowerCase().includes(q)
+    );
+  });
+
+  const selected = POLICY_RULES.find((r) => r.id === selectedId);
+
+  const getGateColor = (effect) => {
+    switch (effect) {
+      case "BLOCK": return "text-[#991B1B] bg-[#FEF2F2] border-[#FECACA]";
+      case "REVIEW": return "text-[#B45309] bg-[#FFFBEB] border-[#FDE68A]";
+      default: return "text-[#5C6854] bg-[#F4FAED] border-[#18280E]/15";
+    }
+  };
 
   return (
     <AppShell breadcrumbs={[{ label: "Policy Rules" }]}>
-      <div className="p-6 md:p-8 space-y-6 max-w-7xl mx-auto">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-[var(--cg-line)]">
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight text-[var(--cg-ink)]">Deterministic Policy Rules</h1>
-            <p className="text-xs text-[var(--cg-ink-secondary)] mt-0.5">
-              Read-only deterministic governance specification governing merge gate transitions.
+      <div className="flex-1 flex flex-col min-h-[calc(100vh-56px)]">
+        {/* Header */}
+        <div className="px-6 md:px-8 pt-8 pb-6">
+          <div className="max-w-3xl mx-auto flex flex-col items-center text-center">
+            <h1 className="text-2xl font-bold tracking-tight text-[#090F05]">
+              Policy Rules
+            </h1>
+            <p className="text-sm text-[#5C6854] mt-1.5">
+              Deterministic governance rules that control merge gate decisions.
             </p>
-          </div>
 
-          {/* Explicit Version Disclosures */}
-          <div className="flex flex-wrap items-center gap-2 text-[11px] font-mono">
-            <span className="px-2 py-0.5 rounded bg-white border border-[var(--cg-line)] text-[var(--cg-ink)]">
-              Rule Set: <strong>CG-2026.1</strong>
-            </span>
-            <span className="px-2 py-0.5 rounded bg-white border border-[var(--cg-line)] text-[var(--cg-ink)]">
-              Contract: <strong>v1.0</strong>
-            </span>
-            <span className="px-2 py-0.5 rounded bg-white border border-[var(--cg-line)] text-[var(--cg-ink)]">
-              Engine Build: <strong>1.0.0</strong>
-            </span>
+            {/* Search */}
+            <div className="w-full max-w-lg mt-5 relative">
+              <SearchIcon size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-[#8A9684]" />
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search policies by name or category..."
+                className="w-full pl-11 pr-4 py-3 rounded-xl bg-white border-2 border-[#18280E]/12 text-sm text-[#090F05] placeholder-[#8A9684] outline-none focus:border-[#18280E] transition-colors"
+              />
+            </div>
           </div>
         </div>
 
-        {/* Master-Detail Layout */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          {/* Left Column: Compact Grouped Rule List (5 cols) */}
-          <div className="lg:col-span-5 bg-white border border-[var(--cg-line)] rounded-lg shadow-xs overflow-hidden flex flex-col">
-            <div className="p-3 bg-[var(--cg-surface)] border-b border-[var(--cg-line)] text-xs font-mono font-bold uppercase tracking-wider text-[var(--cg-ink-secondary)]">
-              Active Rules ({POLICY_RULES.length})
-            </div>
-
-            <div className="divide-y divide-[var(--cg-line)] overflow-y-auto max-h-[600px]">
-              {POLICY_RULES.map((rule) => {
-                const isSelected = rule.id === selectedRuleId;
+        {/* Policy Cards */}
+        <div className="flex-1 px-6 md:px-8 pb-8">
+          <div className="max-w-3xl mx-auto space-y-3">
+            {filtered.length === 0 ? (
+              <div className="py-12 text-center text-sm text-[#8A9684]">
+                No policies matching "{search}"
+              </div>
+            ) : (
+              filtered.map((rule) => {
+                const isOpen = selectedId === rule.id;
                 return (
                   <div
                     key={rule.id}
-                    onClick={() => setSelectedRuleId(rule.id)}
-                    className={`p-3.5 cursor-pointer transition-colors ${
-                    isSelected ?
-                    "bg-[var(--cg-accent-subtle)] border-l-4 border-l-[var(--cg-accent)]" :
-                    "hover:bg-[var(--cg-surface)]"}`
-                    }>
-                    
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="font-mono text-xs font-bold text-[var(--cg-ink)]">{rule.id}</span>
-                      <span
-                        className={`text-[10px] font-mono font-bold px-1.5 py-0.2 rounded border ${
-                        rule.gateEffect === "BLOCK" ?
-                        "bg-[var(--cg-block-subtle)] text-[var(--cg-block)] border-[var(--cg-block-line)]" :
-                        rule.gateEffect === "REVIEW" ?
-                        "bg-[var(--cg-review-subtle)] text-[var(--cg-review)] border-[var(--cg-review-line)]" :
-                        "bg-[var(--cg-surface-subtle)] text-[var(--cg-ink-secondary)] border-[var(--cg-line)]"}`
-                        }>
-                        
-                        {rule.gateEffect}
-                      </span>
+                    className={`rounded-xl bg-white border transition-all cursor-pointer ${
+                      isOpen
+                        ? "border-[#18280E]/30 shadow-sm"
+                        : "border-[#18280E]/10 hover:border-[#18280E]/25"
+                    }`}
+                    onClick={() => setSelectedId(isOpen ? null : rule.id)}
+                  >
+                    <div className="p-5">
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-mono font-bold text-[#18280E]">{rule.id}</span>
+                            <span className="text-[10px] text-[#8A9684]">·</span>
+                            <span className="text-[11px] text-[#5C6854]">{rule.category}</span>
+                          </div>
+                          <div className="text-sm font-semibold text-[#090F05] mt-1">
+                            {rule.name}
+                          </div>
+                          <div className="text-xs text-[#5C6854] mt-1">
+                            {rule.summary}
+                          </div>
+                        </div>
+                        <span className={`inline-flex px-2 py-0.5 rounded text-[10px] font-mono font-bold border shrink-0 ${getGateColor(rule.gateEffect)}`}>
+                          {rule.gateEffect}
+                        </span>
+                      </div>
                     </div>
 
-                    <div className="text-xs font-semibold text-[var(--cg-ink)] truncate">{rule.name}</div>
-                    <div className="text-[11px] text-[var(--cg-ink-secondary)] truncate mt-0.5">{rule.summary}</div>
-                  </div>);
-
-              })}
-            </div>
-          </div>
-
-          {/* Right Column: Rule Detail Inspector (7 cols) */}
-          <div className="lg:col-span-7 bg-white border border-[var(--cg-line)] rounded-lg p-6 shadow-xs space-y-6">
-            <div className="border-b border-[var(--cg-line)] pb-4">
-              <div className="flex items-center justify-between mb-1">
-                <span className="text-xs font-mono font-bold text-[var(--cg-accent)]">{selectedRule.id}</span>
-                <span className="text-xs font-mono text-[var(--cg-ink-secondary)]">{selectedRule.category}</span>
-              </div>
-              <h2 className="text-xl font-bold text-[var(--cg-ink)]">{selectedRule.name}</h2>
-              <p className="text-xs text-[var(--cg-ink-secondary)] mt-1">{selectedRule.summary}</p>
-            </div>
-
-            <div className="space-y-4 text-xs">
-              <div className="space-y-1.5">
-                <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-[var(--cg-ink-secondary)]">
-                  Deterministic Behavior Specification:
-                </span>
-                <div className="p-3 bg-[var(--cg-surface)] border border-[var(--cg-line)] rounded-md text-[var(--cg-ink)] leading-relaxed">
-                  {selectedRule.behavior}
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
-                <div className="p-3 bg-[var(--cg-surface)] border border-[var(--cg-line)] rounded-md space-y-1">
-                  <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-[var(--cg-ink-secondary)]">
-                    Gate Effect:
-                  </span>
-                  <div className="font-semibold text-[var(--cg-ink)]">{selectedRule.gateEffectDesc}</div>
-                </div>
-
-                <div className="p-3 bg-[var(--cg-surface)] border border-[var(--cg-line)] rounded-md space-y-1">
-                  <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-[var(--cg-ink-secondary)]">
-                    Reviewer Exception Eligibility:
-                  </span>
-                  <div className="font-semibold text-[var(--cg-ink)]">
-                    {selectedRule.reviewerEligible ? "Eligible for human exception" : "Immutable Invariant (No exception)"}
+                    {/* Expanded detail */}
+                    {isOpen && (
+                      <div className="px-5 pb-5 pt-0 border-t border-[#18280E]/08 mt-0 animate-fade-in">
+                        <div className="flex items-center gap-4 pt-4 text-xs text-[#5C6854]">
+                          <div className="flex items-center gap-1.5">
+                            <ShieldIcon size={12} className="text-[#18280E]" />
+                            <span>Gate Effect: <strong className="text-[#090F05]">{rule.gateEffect}</strong></span>
+                          </div>
+                          <span className="w-1 h-1 rounded-full bg-[#18280E]/15" />
+                          <span>
+                            Exception: <strong className="text-[#090F05]">{rule.reviewerEligible ? "Eligible" : "Not allowed"}</strong>
+                          </span>
+                        </div>
+                      </div>
+                    )}
                   </div>
-                </div>
-              </div>
-
-              <div className="space-y-1 pt-2">
-                <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-[var(--cg-ink-secondary)]">
-                  Reviewer Notes:
-                </span>
-                <div className="text-xs text-[var(--cg-ink-secondary)] leading-relaxed">
-                  {selectedRule.reviewerNotes}
-                </div>
-              </div>
-            </div>
-
-            <div className="pt-4 border-t border-[var(--cg-line)] flex items-center justify-between text-[11px] text-[var(--cg-ink-secondary)] font-mono">
-              <span>Read-only policy specification</span>
-              <span>Changes require PR with reviewer approval</span>
-            </div>
+                );
+              })
+            )}
           </div>
         </div>
       </div>
-    </AppShell>);
-
+    </AppShell>
+  );
 }

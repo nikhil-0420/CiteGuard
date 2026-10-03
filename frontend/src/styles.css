@@ -8,37 +8,38 @@
 
 @theme {
   /* ── Surfaces ── */
-  --color-cg-page: #FFFFFF;
-  --color-cg-canvas: #F8FAF9;
+  --color-cg-page: #FAFBF9;
+  --color-cg-canvas: #F8FAF6;
   --color-cg-surface: #FFFFFF;
-  --color-cg-surface-subtle: #F0F4F2;
+  --color-cg-surface-subtle: #F4FAED;
 
   /* ── Typography ── */
-  --color-cg-ink: #0F172A;
-  --color-cg-ink-secondary: #475569;
-  --color-cg-ink-muted: #94A3B8;
+  --color-cg-ink: #090F05;
+  --color-cg-ink-secondary: #5C6854;
+  --color-cg-ink-muted: #8A9684;
 
   /* ── Borders ── */
-  --color-cg-line: #E2E8F0;
+  --color-cg-line: rgba(24, 40, 14, 0.10);
   --color-cg-line-green: #D1FAE5;
 
   /* ── Accents ── */
-  --color-cg-accent: #059669;
-  --color-cg-accent-hover: #047857;
-  --color-cg-accent-subtle: #ECFDF5;
+  --color-cg-accent: #18280E;
+  --color-cg-accent-hover: #223814;
+  --color-cg-accent-subtle: #F4FAED;
+  --color-cg-accent-lime: #B2EB76;
   
   /* ── Semantic ── */
-  --color-cg-pass: #059669;
-  --color-cg-pass-subtle: rgba(5, 150, 105, 0.1);
-  --color-cg-pass-line: rgba(5, 150, 105, 0.2);
+  --color-cg-pass: #166534;
+  --color-cg-pass-subtle: #F4FAED;
+  --color-cg-pass-line: rgba(24, 40, 14, 0.18);
   
-  --color-cg-review: #D97706;
-  --color-cg-review-subtle: rgba(217, 119, 6, 0.1);
-  --color-cg-review-line: rgba(217, 119, 6, 0.2);
+  --color-cg-review: #B45309;
+  --color-cg-review-subtle: #FFFBEB;
+  --color-cg-review-line: #FDE68A;
   
-  --color-cg-block: #DC2626;
-  --color-cg-block-subtle: rgba(220, 38, 38, 0.1);
-  --color-cg-block-line: rgba(220, 38, 38, 0.2);
+  --color-cg-block: #991B1B;
+  --color-cg-block-subtle: #FEF2F2;
+  --color-cg-block-line: #FECACA;
 
   /* ── Fonts ── */
   --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
@@ -48,33 +49,44 @@
 
 /* ── CSS Custom Properties ── */
 :root {
-  --cg-page: #FFFFFF;
-  --cg-canvas: #F8FAF9;
+  --cg-page: #FAFBF9;
+  --cg-canvas: #F8FAF6;
   --cg-surface: #FFFFFF;
-  --cg-surface-subtle: #F0F4F2;
+  --cg-surface-subtle: #F4FAED;
   
-  --cg-ink: #0F172A;
-  --cg-ink-secondary: #475569;
-  --cg-ink-muted: #94A3B8;
+  --cg-ink: #090F05;
+  --cg-ink-secondary: #5C6854;
+  --cg-ink-muted: #8A9684;
   
-  --cg-line: #E2E8F0;
+  --cg-line: rgba(24, 40, 14, 0.10);
   --cg-line-green: #D1FAE5;
   
-  --cg-accent: #059669;
-  --cg-accent-hover: #047857;
-  --cg-accent-subtle: #ECFDF5;
+  --cg-accent: #18280E;
+  --cg-accent-hover: #223814;
+  --cg-accent-subtle: #F4FAED;
+  --cg-accent-lime: #B2EB76;
   
-  --cg-pass: #059669;
-  --cg-pass-subtle: rgba(5, 150, 105, 0.1);
-  --cg-pass-line: rgba(5, 150, 105, 0.2);
+  --cg-pass: #166534;
+  --cg-pass-subtle: #F4FAED;
+  --cg-pass-line: rgba(24, 40, 14, 0.18);
   
-  --cg-review: #D97706;
-  --cg-review-subtle: rgba(217, 119, 6, 0.1);
-  --cg-review-line: rgba(217, 119, 6, 0.2);
+  --cg-review: #B45309;
+  --cg-review-subtle: #FFFBEB;
+  --cg-review-line: #FDE68A;
   
-  --cg-block: #DC2626;
-  --cg-block-subtle: rgba(220, 38, 38, 0.1);
-  --cg-block-line: rgba(220, 38, 38, 0.2);
+  --cg-block: #991B1B;
+  --cg-block-subtle: #FEF2F2;
+  --cg-block-line: #FECACA;
+
+  /* ── Spade Design System Tokens ── */
+  --spade-ink: #090F05;
+  --spade-ink-muted: #5C6854;
+  --spade-card: #F4FAED;
+  --spade-card-border: rgba(24, 40, 14, 0.08);
+  --spade-btn: #18280E;
+  --spade-btn-hover: #223814;
+  --spade-btn-text: #B2EB76;
+  --spade-pill-bg: #F3F5F0;
 }
 
 /* ── Resets ── */
