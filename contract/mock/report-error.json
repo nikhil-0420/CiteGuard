@@ -1,0 +1,59 @@
+{
+  "contract_version": "1.0",
+  "report_id": "error",
+  "repo": "nikhil-0420/citeguard-demo",
+  "pr_number": 1,
+  "commit_sha": "9f3c2a1d7b6e4a58c0d1e2f3a4b5c6d7e8f90123",
+  "policy_version": "1.0.0",
+  "generated_at": "2026-10-03T12:30:00+00:00",
+  "cached": false,
+  "gate": {
+    "state": "error",
+    "description": "Extraction incomplete or empty — cannot pass",
+    "reasons": [
+      "CG-GATE-01"
+    ],
+    "report_url": "http://localhost:5173/?report=error"
+  },
+  "extraction": {
+    "markers_found": 7,
+    "claims_extracted": 0,
+    "complete": false,
+    "issues": [
+      "Line 36: multiple citation markers in one sentence (non-atomic claim)",
+      "Marker/claim count mismatch: 7 markers vs 5 claims"
+    ]
+  },
+  "summary": {
+    "references_total": 0,
+    "claims_total": 0,
+    "counts": {
+      "supported": 0,
+      "partial": 0,
+      "not_supported_in_reviewed_evidence": 0,
+      "contradicted": 0,
+      "unavailable": 0
+    },
+    "review_count": 0,
+    "blocked_count": 0,
+    "passed_count": 0
+  },
+  "findings": [],
+  "budget": {
+    "tool_calls_used": 0,
+    "tool_calls_max": 24,
+    "elapsed_ms": 900,
+    "deadline_ms": 90000,
+    "exhausted": false
+  },
+  "review": {
+    "state": "none",
+    "request_url": null
+  },
+  "voice_briefing": {
+    "available": false,
+    "cached": false,
+    "url": null,
+    "script": null
+  }
+}

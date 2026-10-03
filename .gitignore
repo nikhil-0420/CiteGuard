@@ -1,0 +1,12 @@
+node_modules/
+dist/
+__pycache__/
+.pytest_cache/
+.venv/
+.env
+*.log
+.DS_Store
+screenshots/
+*.zip
+scratch/
+test_hero.png
