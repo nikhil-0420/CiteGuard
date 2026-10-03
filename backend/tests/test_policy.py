@@ -69,16 +69,3 @@ def test_technical_error_never_passes():
     _, _, gate = build_report_fields(r.findings, 4, True, r.commit_sha, "u", technical_error=True)
     assert gate.state == "error"
 
-
-def test_dynamic_voice_script():
-    from app.pipeline import generate_voice_script
-    r_blocked = load("blocked")
-    script_blocked = generate_voice_script(r_blocked.findings, r_blocked.summary, "failure")
-    assert "CiteGuard checked" in script_blocked
-    assert "blocked:" in script_blocked
-    assert "Fix the blocked items" in script_blocked
-
-    r_passed = load("passed")
-    script_passed = generate_voice_script(r_passed.findings, r_passed.summary, "success")
-    assert "All claims satisfy policy" in script_passed
-

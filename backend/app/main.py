@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from .config import settings
 from .store import store
 from .routes.api import router
+from .routes.tools import router as tools_router, ingest_router
 
 
 @asynccontextmanager
@@ -21,4 +22,5 @@ app.add_middleware(
     allow_headers=["*"],
 )
 app.include_router(router)
-
+app.include_router(tools_router)
+app.include_router(ingest_router)

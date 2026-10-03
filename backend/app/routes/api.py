@@ -6,8 +6,10 @@ from ..config import settings
 from ..models import AuditRequest, ExceptionRequest, Exception_
 from ..store import store
 from ..policy import build_report_fields, now_iso
-from ..pipeline import run_audit
 from ..notify import publish
+from ..nuroen_client import trigger as nuroen_trigger
+from ..github_pr import fetch_pr_markdown
+from ..github_status import set_commit_status
 from ..security import verify_github_signature, SeenEvents
 
 router = APIRouter()
@@ -35,14 +37,11 @@ def get_report(report_id: str):
 
 
 @router.post("/api/audit", status_code=202)
-async def start_audit(req: AuditRequest, bg: BackgroundTasks):
+async def start_audit(req: AuditRequest):
     key = f"{req.repo}#{req.pr_number}@{req.commit_sha}"
     if not seen.first_time(key):                      # idempotent per commit (CG-ACTION-01)
         return JSONResponse(status_code=202, content={"report_id": None, "duplicate": True})
-    report = await run_audit(req)                     # sync for now; Sam can move to background
-    store.put(report)
-    bg.add_task(publish, report, "audit_complete")
-    return {"report_id": report.report_id}
+    return await nuroen_trigger(req)                  # Nuroen agents audit; they call /api/ingest when done
 
 
 @router.post("/api/reports/{report_id}/exceptions")
@@ -72,34 +71,13 @@ async def add_exception(report_id: str, body: ExceptionRequest):
     return r
 
 
-async def fetch_pr_markdown(repo: str, pr_number: int, head_sha: str) -> str | None:
-    headers = {"Accept": "application/vnd.github+json"}
-    if settings.github_token:
-        headers["Authorization"] = f"Bearer {settings.github_token}"
+async def _audit_pr(repo: str, pr: int, sha: str):
+    await set_commit_status(repo, sha, "pending", "CiteGuard is auditing this commit", "")
     try:
-        async with httpx.AsyncClient(timeout=15.0) as client:
-            resp = await client.get(f"https://api.github.com/repos/{repo}/pulls/{pr_number}/files", headers=headers)
-            if resp.status_code != 200:
-                return None
-            files = resp.json()
-            md_files = [f for f in files if f.get("filename", "").endswith(".md") and f.get("status") != "removed"]
-            if not md_files:
-                return None
-            chosen = next((f for f in md_files if "brief" in f.get("filename", "").lower()), md_files[0])
-            raw_url = chosen.get("raw_url")
-            if raw_url:
-                raw_resp = await client.get(raw_url, headers=headers)
-                if raw_resp.status_code == 200:
-                    return raw_resp.text
-            contents_url = f"https://api.github.com/repos/{repo}/contents/{chosen.get('filename')}"
-            c_resp = await client.get(contents_url, headers=headers, params={"ref": head_sha})
-            if c_resp.status_code == 200:
-                import base64
-                content_b64 = c_resp.json().get("content", "")
-                return base64.b64decode(content_b64).decode("utf-8", errors="replace")
-    except Exception:
-        return None
-    return None
+        md = await fetch_pr_markdown(repo, pr, sha)
+        await nuroen_trigger(AuditRequest(repo=repo, pr_number=pr, commit_sha=sha, markdown=md))
+    except Exception as exc:                          # never leave the gate open on a technical failure
+        await set_commit_status(repo, sha, "error", f"CiteGuard could not start: {str(exc)[:90]}", "")
 
 
 @router.post("/webhooks/github", status_code=202)
@@ -111,20 +89,10 @@ async def github_webhook(request: Request, bg: BackgroundTasks):
     if delivery and not seen.first_time(f"delivery:{delivery}"):
         return {"duplicate": True}
     payload = json.loads(body or b"{}")
-
-    action = payload.get("action")
-    pr = payload.get("pull_request")
-    if pr and action in ("opened", "synchronize", "reopened"):
-        repo = payload.get("repository", {}).get("full_name", "")
-        pr_number = pr.get("number", 1)
-        head_sha = pr.get("head", {}).get("sha", "")
-        if repo and head_sha:
-            md = await fetch_pr_markdown(repo, pr_number, head_sha)
-            if md:
-                audit_req = AuditRequest(repo=repo, pr_number=pr_number, commit_sha=head_sha, markdown=md)
-                report = await run_audit(audit_req)
-                store.put(report)
-                bg.add_task(publish, report, "audit_complete")
-                return {"accepted": True, "action": action, "report_id": report.report_id}
-
-    return {"accepted": True, "action": action}
+    if request.headers.get("X-GitHub-Event") == "pull_request" and payload.get("action") in ("opened", "synchronize", "reopened"):
+        repo = payload["repository"]["full_name"]
+        pr = payload["pull_request"]["number"]
+        sha = payload["pull_request"]["head"]["sha"]
+        if seen.first_time(f"{repo}#{pr}@{sha}"):     # one audit per commit
+            bg.add_task(_audit_pr, repo, pr, sha)
+    return {"accepted": True, "action": payload.get("action")}
