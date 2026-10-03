@@ -1,7 +1,7 @@
 """Tool + callback endpoints for the Nuroen agents (Nuroen -> us). All guarded by X-API-Key.
 LLM proposes (in Nuroen), this code disposes (deterministic)."""
 from __future__ import annotations
-import re, time, uuid
+import re, time, uuid, unicodedata
 from difflib import SequenceMatcher
 from typing import Optional
 from fastapi import APIRouter, Depends, Header, HTTPException
@@ -51,13 +51,32 @@ class CompareIn(BaseModel):
     found: Optional[Meta] = None   # null/empty => nothing resolved
 
 
+def _strip_accents(s: str) -> str:
+    return unicodedata.normalize("NFKD", s).encode("ascii", "ignore").decode("ascii")
+
+
 def _norm(s: str) -> str:
+    s = _strip_accents(s)
     return re.sub(r"[^a-z0-9 ]", "", s.lower()).strip()
 
 
 def _surname(a: str) -> str:
-    a = a.strip()
-    return _norm(a.split(",")[0] if "," in a else a.split()[-1] if a.split() else "")
+    a = _strip_accents(a.strip())
+    part = a.split(",")[0] if "," in a else a.split()[-1] if a.split() else ""
+    return re.sub(r"[^a-z0-9]", "", part.lower())
+
+
+def _title_match(t1: str, t2: str) -> bool:
+    n1, n2 = _norm(t1), _norm(t2)
+    if not n1 or not n2:
+        return False
+    if n1 == n2 or SequenceMatcher(None, n1, n2).ratio() >= 0.85:
+        return True
+    m1 = _norm(re.split(r"[:\-—]", t1)[0])
+    m2 = _norm(re.split(r"[:\-—]", t2)[0])
+    if m1 and m2 and (m1 == m2 or SequenceMatcher(None, m1, m2).ratio() >= 0.9):
+        return True
+    return False
 
 
 @router.post("/compare-identity", dependencies=[Depends(require_key)])
@@ -66,15 +85,22 @@ def compare_identity(body: CompareIn):
     if f is None or not (f.title or f.doi):
         return {"status": "unresolved", "mismatch_fields": []}
     mism: list[str] = []
-    if SequenceMatcher(None, _norm(c.title), _norm(f.title)).ratio() < 0.9:
+    if c.title and f.title and not _title_match(c.title, f.title):
         mism.append("title")
     if c.year and f.year and c.year != f.year:
         mism.append("year")
     if c.authors and f.authors:
-        if _surname(c.authors[0]) != _surname(f.authors[0]):
+        c_first = _surname(c.authors[0])
+        f_first = _surname(f.authors[0])
+        if c_first and f_first and c_first != f_first:
             mism.append("authors")
-        elif len(f.authors) >= 3 and len(c.authors) < len(f.authors) / 2:
-            mism.append("authors")           # truncated author list
+        else:
+            f_surnames = {_surname(a) for a in f.authors if _surname(a)}
+            for ca in c.authors:
+                cs = _surname(ca)
+                if cs and cs not in f_surnames:
+                    mism.append("authors")
+                    break
     return {"status": "metadata_mismatch" if mism else "matched", "mismatch_fields": mism}
 
 

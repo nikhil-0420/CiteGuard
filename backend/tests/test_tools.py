@@ -25,11 +25,48 @@ def test_compare_identity():
         found = {"title": "Attention Is All You Need", "year": 2017,
                  "authors": ["Vaswani", "Shazeer", "Parmar", "Uszkoreit", "Jones", "Gomez", "Kaiser", "Polosukhin"]}
         r = c.post("/tools/compare-identity", json={"cited": cited, "found": found}, headers=H).json()
-        assert r["status"] == "metadata_mismatch" and set(r["mismatch_fields"]) == {"year", "authors"}
+        # Truncated author list is no longer flagged; preprint (2017) vs cited (2018) year difference flags year
+        assert r["status"] == "metadata_mismatch" and set(r["mismatch_fields"]) == {"year"}
         ok = c.post("/tools/compare-identity", json={"cited": found, "found": found}, headers=H).json()
         assert ok["status"] == "matched"
         none = c.post("/tools/compare-identity", json={"cited": cited, "found": None}, headers=H).json()
         assert none["status"] == "unresolved"
+
+
+def test_compare_identity_accents_subtitles_and_authors():
+    with TestClient(app) as c:
+        # Accents normalized (e.g. Müller -> Muller, Bengio)
+        cited = {"title": "Deep Learning with Müller", "authors": ["Müller, J."], "year": 2020}
+        found = {"title": "Deep Learning with Muller", "authors": ["Muller, J.", "Bengio, Y."], "year": 2020}
+        r = c.post("/tools/compare-identity", json={"cited": cited, "found": found}, headers=H).json()
+        assert r["status"] == "matched"
+
+        # Subtitle difference ("Title: Subtitle" vs "Title")
+        cited_sub = {"title": "Attention Is All You Need: Architecture & Scaling", "authors": ["Vaswani, A."], "year": 2017}
+        found_main = {"title": "Attention Is All You Need", "authors": ["Vaswani, Ashish"], "year": 2017}
+        r2 = c.post("/tools/compare-identity", json={"cited": cited_sub, "found": found_main}, headers=H).json()
+        assert r2["status"] == "matched"
+
+        # Hyphens and case variation
+        cited_hyphen = {"title": "Self-Supervised Learning", "authors": ["Le-Cun, Y."], "year": 2021}
+        found_hyphen = {"title": "self supervised learning", "authors": ["Lecun, Yann"], "year": 2021}
+        r3 = c.post("/tools/compare-identity", json={"cited": cited_hyphen, "found": found_hyphen}, headers=H).json()
+        assert r3["status"] == "matched"
+
+        # First author surname difference
+        cited_diff_first = {"title": "Attention Is All You Need", "authors": ["Devlin, J."], "year": 2017}
+        r4 = c.post("/tools/compare-identity", json={"cited": cited_diff_first, "found": found_main}, headers=H).json()
+        assert r4["status"] == "metadata_mismatch" and "authors" in r4["mismatch_fields"]
+
+        # Missing cited author in found list
+        cited_missing = {"title": "Attention Is All You Need", "authors": ["Vaswani, A.", "Nonexistent, Z."], "year": 2017}
+        r5 = c.post("/tools/compare-identity", json={"cited": cited_missing, "found": found_main}, headers=H).json()
+        assert r5["status"] == "metadata_mismatch" and "authors" in r5["mismatch_fields"]
+
+        # Preprint (2017) vs Publication (2018) year difference flags year limitation
+        cited_year = {"title": "Attention Is All You Need", "authors": ["Vaswani, A."], "year": 2018}
+        r6 = c.post("/tools/compare-identity", json={"cited": cited_year, "found": found_main}, headers=H).json()
+        assert r6["status"] == "metadata_mismatch" and r6["mismatch_fields"] == ["year"]
 
 
 def test_validate_quote():
