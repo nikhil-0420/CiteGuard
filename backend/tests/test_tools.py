@@ -111,3 +111,62 @@ def test_pr_webhook_sets_pending_then_triggers_nuroen(monkeypatch):
     with TestClient(app) as c:
         assert c.post("/webhooks/github", content=body, headers=h).status_code == 202
     assert calls["status"] == ["pending"] and calls["trigger"] == ("o/r", 7, "abc1234", "# md")
+
+
+def test_github_approval_verification_scenarios(monkeypatch):
+    import httpx
+    import app.github_pr as gh
+    from app.config import settings
+    settings.reviewer_allowlist = "nikhil-0420"
+    settings.github_token = "dummy-token"
+
+    # Case 1: Valid approval on exact commit
+    reviews_page1 = [
+        {"user": {"login": "nikhil-0420"}, "state": "APPROVED", "commit_id": "sha-1", "id": 1}
+    ]
+    class MockResp:
+        def __init__(self, data, status_code=200):
+            self._data = data
+            self.status_code = status_code
+        def json(self): return self._data
+        def raise_for_status(self):
+            if self.status_code != 200: raise httpx.HTTPStatusError("Err", request=None, response=None)
+
+    async def mock_get(url, *args, **kwargs):
+        return MockResp(reviews_page1)
+
+    monkeypatch.setattr(httpx.AsyncClient, "get", mock_get)
+
+    import asyncio
+    assert asyncio.run(gh.verify_pr_approval("o/r", 1, "sha-1", "nikhil-0420")) is True
+    # Wrong commit -> False
+    assert asyncio.run(gh.verify_pr_approval("o/r", 1, "sha-diff", "nikhil-0420")) is False
+    # Non-allowlisted reviewer -> False
+    assert asyncio.run(gh.verify_pr_approval("o/r", 1, "sha-1", "mallory")) is False
+
+    # Case 2: Later CHANGES_REQUESTED cancels approval
+    cancelled_reviews = [
+        {"user": {"login": "nikhil-0420"}, "state": "APPROVED", "commit_id": "sha-1", "id": 1},
+        {"user": {"login": "nikhil-0420"}, "state": "CHANGES_REQUESTED", "commit_id": "sha-1", "id": 2},
+    ]
+    async def mock_cancelled(*a, **kw): return MockResp(cancelled_reviews)
+    monkeypatch.setattr(httpx.AsyncClient, "get", mock_cancelled)
+    assert asyncio.run(gh.verify_pr_approval("o/r", 1, "sha-1", "nikhil-0420")) is False
+
+    # Case 3: Later COMMENTED does NOT cancel approval
+    commented_reviews = [
+        {"user": {"login": "nikhil-0420"}, "state": "APPROVED", "commit_id": "sha-1", "id": 1},
+        {"user": {"login": "nikhil-0420"}, "state": "COMMENTED", "commit_id": "sha-1", "id": 2},
+    ]
+    async def mock_commented(*a, **kw): return MockResp(commented_reviews)
+    monkeypatch.setattr(httpx.AsyncClient, "get", mock_commented)
+    assert asyncio.run(gh.verify_pr_approval("o/r", 1, "sha-1", "nikhil-0420")) is True
+
+    # Case 4: GitHub API fails -> fail closed
+    async def mock_fail(*a, **kw): return MockResp(None, status_code=500)
+    monkeypatch.setattr(httpx.AsyncClient, "get", mock_fail)
+    assert asyncio.run(gh.verify_pr_approval("o/r", 1, "sha-1", "nikhil-0420")) is False
+
+    # Reset token for subsequent tests
+    settings.github_token = ""
+

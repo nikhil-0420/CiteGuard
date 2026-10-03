@@ -8,7 +8,7 @@ from ..store import store
 from ..policy import build_report_fields, now_iso
 from ..notify import publish
 from ..nuroen_client import trigger as nuroen_trigger
-from ..github_pr import fetch_pr_markdown
+from ..github_pr import fetch_pr_markdown, verify_pr_approval
 from ..github_status import set_commit_status
 from ..security import verify_github_signature, SeenEvents
 
@@ -51,6 +51,9 @@ async def add_exception(report_id: str, body: ExceptionRequest):
         raise HTTPException(404, detail={"error": "report not found", "code": "not_found"})
     if body.reviewer.lower() not in settings.allowlist:
         raise HTTPException(403, detail={"error": "reviewer not allowlisted", "code": "not_allowlisted"})
+    is_valid = await verify_pr_approval(r.repo, r.pr_number, body.commit_sha, body.reviewer)
+    if not is_valid:
+        raise HTTPException(403, detail={"error": "unverified GitHub approval", "code": "not_allowlisted"})
     if body.commit_sha != r.commit_sha:                # stale approval on changed commit is rejected
         r.review.state = "stale"
         raise HTTPException(409, detail={"error": "approval is for a different commit", "code": "stale_commit"})

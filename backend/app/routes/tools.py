@@ -13,6 +13,7 @@ from ..policy import build_report_fields, now_iso
 from ..store import store
 from ..notify import publish
 from ..agent.judge import validate_quote
+from ..github_pr import verify_pr_approval
 
 router = APIRouter(prefix="/tools", tags=["tools"])
 ingest_router = APIRouter(tags=["ingest"])
@@ -120,11 +121,15 @@ class IngestIn(BaseModel):
 
 @ingest_router.post("/api/ingest", dependencies=[Depends(require_key)])
 async def ingest(body: IngestIn):
-    # CG-HUMAN-01: every exception must come from an allowlisted reviewer and carry a reason.
+    # CG-HUMAN-01: every exception must come from an allowlisted reviewer, carry a reason, and have a confirmed GitHub approval.
     for f in body.findings:
         ex = f.exception
-        if ex and (ex.reviewer.lower() not in settings.allowlist or not ex.reason.strip()):
-            raise HTTPException(403, detail={"error": f"exception by '{ex.reviewer}' rejected", "code": "not_allowlisted"})
+        if ex:
+            if ex.reviewer.lower() not in settings.allowlist or not ex.reason.strip():
+                raise HTTPException(403, detail={"error": f"exception by '{ex.reviewer}' rejected", "code": "not_allowlisted"})
+            is_valid = await verify_pr_approval(body.repo, body.pr_number, body.commit_sha, ex.reviewer)
+            if not is_valid:
+                raise HTTPException(403, detail={"error": f"exception by '{ex.reviewer}' rejected: unverified GitHub approval", "code": "not_allowlisted"})
     stale = any(f.exception and f.exception.commit_sha != body.commit_sha for f in body.findings)
     rid = f"pr{body.pr_number}-{body.commit_sha[:7]}"      # deterministic: re-ingest after approval REPLACES the report
     url = f"{settings.frontend_url}/?report={rid}"
