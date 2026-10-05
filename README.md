@@ -2,12 +2,13 @@
 
 ### Governed Citation Audit for AI-Written Reports: Evidence-Backed Findings, Human Approval, and a GitHub Merge Gate
 
-[![Live Demo](https://img.shields.io/badge/Live%20Demo-TBD-black?style=for-the-badge)](https://your-demo-url.example/)
-[![Repo](https://img.shields.io/badge/Repo-GitHub-181717?style=for-the-badge&logo=github)](https://github.com/<owner>/<repo>)
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-Vercel-black?style=for-the-badge)](https://cite-guard-beige.vercel.app/)
 [![Python](https://img.shields.io/badge/Python-3.11%2B-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
 [![React](https://img.shields.io/badge/React-18-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://react.dev/)
 [![Nuroen](https://img.shields.io/badge/Agents-Nuroen-4F46E5?style=for-the-badge)](https://www.nuroen.com/)
+
+[**Live Demo**](https://cite-guard-beige.vercel.app/)
 
 > ⚠️ **Note:** The frontend runs on recorded mock reports (clearly badged "mock data") when no backend is connected. Any cached result shown in a demo is labeled **cached**, never presented as a fresh call.
 
@@ -174,6 +175,7 @@ host, review timeout.
 - A tunnel for webhooks and tools (`cloudflared` or `ngrok`)
 
 ### 1. Clone and install
+
 ```bash
 git clone https://github.com/<owner>/<repo>.git
 cd <repo>
@@ -182,30 +184,36 @@ cd ../frontend && npm install
 ```
 
 ### 2. Configure environment
+
 ```bash
 cd backend && cp .env.example .env
 ```
+
 Fill `GITHUB_TOKEN`, `GITHUB_WEBHOOK_SECRET`, `TOOLS_API_KEY`,
 `REVIEWER_ALLOWLIST`, and (once known) `NUROEN_INVOKE_URL`. Generate secrets
 with `python -c "import secrets; print(secrets.token_urlsafe(32))"`.
 `.env` is gitignored; never commit it. No LLM key is needed here.
 
 ### 3. Run in mock mode (no external services)
+
 ```bash
 cd backend && MOCK_MODE=true uvicorn app.main:app --reload --port 8000
 cd frontend && npm run dev          # http://localhost:5173
 ```
 
 ### 4. Go live
+
 ```bash
 cloudflared tunnel --url http://localhost:8000   # set PUBLIC_BASE_URL to the https URL
 ```
+
 - GitHub (demo repo): webhook → `<tunnel>/webhooks/github`, content type
   JSON, event **Pull requests**; branch protection requiring status `CiteGuard`
 - Nuroen: add a custom API connector at the tunnel URL with header `X-API-Key`
 - Frontend: set `VITE_USE_MOCK=false` and `VITE_API_URL` in `frontend/.env`
 
 ### Checks
+
 ```bash
 cd backend && python -m pytest -q
 bash scripts/smoke.sh               # full integration check
